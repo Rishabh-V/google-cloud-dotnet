@@ -15,6 +15,7 @@
 using Google.Api.Gax;
 using Google.Api.Gax.ResourceNames;
 using Google.Cloud.ClientTesting;
+using Google.Cloud.Spanner.Admin.Database.V1;
 using Google.Cloud.Spanner.Admin.Instance.V1;
 using Google.Cloud.Spanner.Common.V1;
 using Google.Cloud.Spanner.V1.Internal.Logging;
@@ -37,13 +38,14 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
         /// Fetches the database, creating it if necessary.
         /// </summary>
         /// <param name="projectId">The project ID to use, typically from a fixture.</param>
-        public static SpannerTestDatabase GetInstance(string projectId)
+        /// <param name="databaseDialect">The database dialect to be used. Can be either GoogleStandardSql (default) or PostgreSql</param>
+        public static SpannerTestDatabase GetInstance(string projectId, DatabaseDialect databaseDialect = DatabaseDialect.GoogleStandardSql)
         {
             lock (s_lock)
             {
                 if (s_instance == null)
                 {
-                    s_instance = new SpannerTestDatabase(projectId);
+                    s_instance = new SpannerTestDatabase(projectId, databaseDialect);
                 }
                 else if (s_instance.ProjectId != projectId)
                 {
@@ -77,7 +79,7 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
         public DatabaseName DatabaseName { get; }
         internal SpannerClientCreationOptions SpannerClientCreationOptions { get; }
 
-        private SpannerTestDatabase(string projectId)
+        private SpannerTestDatabase(string projectId, DatabaseDialect databaseDialect)
         {
             TestLogger.Install();
 
@@ -101,11 +103,17 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
             MaybeCreateInstanceOnEmulator(projectId);
             if (Fresh)
             {
-                using (var connection = new SpannerConnection(NoDbConnectionString))
+                if (databaseDialect == DatabaseDialect.GoogleStandardSql || databaseDialect == DatabaseDialect.Unspecified)
                 {
+                    using var connection = new SpannerConnection(NoDbConnectionString);
                     var createCmd = connection.CreateDdlCommand($"CREATE DATABASE {SpannerDatabase}");
                     createCmd.ExecuteNonQuery();
                     Logger.DefaultLogger.Debug($"Created database {SpannerDatabase}");
+                }
+                else
+                {
+                    CreatePostgreSqlDatabase();
+                    Logger.DefaultLogger.Debug($"Created database {SpannerDatabase} with PostgreSql dialect.");
                 }
             }
             else
@@ -151,6 +159,32 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
                 {
                     // Ignore
                 }
+            }
+        }
+
+        private void CreatePostgreSqlDatabase()
+        {
+            DatabaseAdminClient databaseAdminClient = DatabaseAdminClient.Create();
+            CreateDatabaseRequest createDatabaseRequest = new CreateDatabaseRequest
+            {
+                CreateStatement = $"CREATE DATABASE {SpannerDatabase}",
+                DatabaseDialect = DatabaseDialect.Postgresql,
+                ParentAsInstanceName = InstanceName.FromProjectInstance(ProjectId, SpannerInstance)
+            };
+
+            try
+            {
+                var operation = databaseAdminClient.CreateDatabase(createDatabaseRequest);
+                var completedResponse = operation.PollUntilCompleted();
+                if (completedResponse.IsFaulted)
+                {
+                    Console.WriteLine($"Error while creating PostgreSQL database: {completedResponse.Exception}");
+                    throw completedResponse.Exception;
+                }
+            }
+            catch (RpcException e) when (e.StatusCode == StatusCode.AlreadyExists)
+            {
+                // Ignore.
             }
         }
 

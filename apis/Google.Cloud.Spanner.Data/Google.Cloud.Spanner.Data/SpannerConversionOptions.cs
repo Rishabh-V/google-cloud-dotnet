@@ -19,21 +19,37 @@ namespace Google.Cloud.Spanner.Data
     /// </summary>
     internal class SpannerConversionOptions
     {
-        // Predefined instances; these will change as the class grows, but hopefully
-        // for most cases we can avoid creating new instances.
-        private static readonly SpannerConversionOptions s_useDBNullForNull = new SpannerConversionOptions(true);
-        private static readonly SpannerConversionOptions s_useClrDefaultForNull = new SpannerConversionOptions(false);
-
-        internal static SpannerConversionOptions Default { get; } = s_useDBNullForNull;
+        internal static SpannerConversionOptions Default { get; } = new SpannerConversionOptions(true, false, false, false);
 
         /// <summary>
         /// True to return DBNull.Value for null values; false to return a null reference.
         /// </summary>
         internal bool UseDBNull { get; }
 
-        private SpannerConversionOptions(bool useDBNull)
+        /// <summary>
+        /// True to use <see cref="V1.SpannerDate"/> for Date type values; false to use <see cref="System.DateTime"/>.
+        /// </summary>
+        internal bool UseSpannerDateForDate { get; }
+
+        /// <summary>
+        /// True to use <see cref="SpannerDbType.Numeric"/> for decimal values; false to use <see cref="SpannerDbType.Float64"/>.
+        /// </summary>
+        internal bool UseSpannerNumericForDecimal { get; }
+
+        /// <summary>
+        /// True to use <see cref="SpannerDbType.PgNumeric"/> for decimal values; false to use <c>Float</c>.
+        /// </summary>
+        internal bool UsePgNumericForDecimal { get; }
+
+        private SpannerConversionOptions(bool useDBNull,
+            bool useSpannerDateForDate,
+            bool useSpannerNumericForDecimal,
+            bool usePgNumericForDecimal)
         {
             UseDBNull = useDBNull;
+            UseSpannerDateForDate = useSpannerDateForDate;
+            UseSpannerNumericForDecimal = useSpannerNumericForDecimal;
+            UsePgNumericForDecimal = usePgNumericForDecimal;
         }
 
         /// <summary>
@@ -46,6 +62,6 @@ namespace Google.Cloud.Spanner.Data
         /// Determines the right conversion options to use based on the connection string of the given connection string builder.
         /// </summary>
         internal static SpannerConversionOptions ForConnectionStringBuilder(SpannerConnectionStringBuilder builder) =>
-            builder == null ? Default : builder.UseClrDefaultForNull ? s_useClrDefaultForNull : s_useDBNullForNull;
+            builder == null ? Default : new SpannerConversionOptions(!builder.UseClrDefaultForNull, builder.UseSpannerDateForDate, builder.UseSpannerNumericForDecimal, builder.UsePgNumericForDecimal);
     }
 }

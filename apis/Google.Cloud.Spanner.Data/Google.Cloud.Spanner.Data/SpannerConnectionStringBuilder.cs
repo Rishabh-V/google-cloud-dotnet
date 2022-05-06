@@ -52,6 +52,9 @@ namespace Google.Cloud.Spanner.Data
         private const string EnableGetSchemaTableKeyword = "EnableGetSchemaTable";
         private const string LogCommitStatsKeyword = "LogCommitStats";
         private const string EmulatorDetectionKeyword = "EmulatorDetection";
+        private const string UseSpannerDateForDateKeyword = "UseSpannerDateForDate";
+        private const string UseSpannerNumericForDecimalKeyword = "UseSpannerNumericForDecimal";
+        private const string UsePgNumericForDecimalKeyword = "UsePgNumericForDecimal";
 
         private InstanceName _instanceName;
         private DatabaseName _databaseName;
@@ -95,6 +98,64 @@ namespace Google.Cloud.Spanner.Data
         {
             get => GetValueOrDefault(UseClrDefaultForNullKeyword).Equals("True", StringComparison.OrdinalIgnoreCase);
             set => this[UseClrDefaultForNullKeyword] = value.ToString(); // Always "True" or "False", regardless of culture.
+        }
+
+        /// <summary>
+        /// Option to change between the default handling of Date type values (return <see cref="DateTime">DateTime</see>) or
+        /// the non-standard handling (return <see cref="SpannerDate"/>).
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// If this is <c>false</c> (the default), <see cref="DateTime"/> will be used to return the value of Date type column.
+        /// </para>
+        /// <para>
+        /// If this is <c>true</c>, <see cref="SpannerDate"/> will be used to return the value of Date type column.
+        /// </para>
+        /// </remarks>
+        public bool UseSpannerDateForDate
+        {
+            get => GetValueOrDefault(UseSpannerDateForDateKeyword).Equals("True", StringComparison.OrdinalIgnoreCase);
+            set => this[UseSpannerDateForDateKeyword] = value.ToString(); // Always "True" or "False", regardless of culture.
+        }
+
+        /// <summary>
+        /// Option to change between the default handling of decimal values (use <see cref="SpannerDbType.Float64"/>) or
+        /// the standard handling (use <see cref="SpannerDbType.Numeric"/>) in Google Standard SQL dialect.
+        /// This option should be used while working with Spanner Google Standard SQL (GSQL) dialect.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// If this is <c>false</c> (the default), <see cref="SpannerDbType.Float64"/> will be used to store and return the decimal values.
+        /// </para>
+        /// <para>
+        /// If this is <c>true</c>, <see cref="SpannerDbType.Numeric"/> will be used to store and return the decimal values.
+        /// </para>
+        /// </remarks>
+        public bool UseSpannerNumericForDecimal
+        {
+            get => GetValueOrDefault(UseSpannerNumericForDecimalKeyword).Equals("True", StringComparison.OrdinalIgnoreCase);
+            set => this[UseSpannerNumericForDecimalKeyword] = value.ToString(); // Always "True" or "False", regardless of culture.
+        }
+
+        // PostgreSQL dialect doesn't have Float64, hence used Float only
+
+        /// <summary>
+        /// Option to change between the default handling of decimal values <c>Float</c> or
+        /// the standard handling (use <see cref="SpannerDbType.PgNumeric"/>) in PostgreSQL dialect.
+        /// This option should be used while working with Spanner PostgreSQL dialect.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// If this is <c>false</c> (the default), <c>Float</c> will be used to store and return the decimal values.
+        /// </para>
+        /// <para>
+        /// If this is <c>true</c>, <see cref="SpannerDbType.PgNumeric"/> will be used to store and return the decimal values.
+        /// </para>
+        /// </remarks>
+        public bool UsePgNumericForDecimal
+        {
+            get => GetValueOrDefault(UsePgNumericForDecimalKeyword).Equals("True", StringComparison.OrdinalIgnoreCase);
+            set => this[UsePgNumericForDecimalKeyword] = value.ToString(); // Always "True" or "False", regardless of culture.
         }
 
         // Note: GetSchemaTable can't be a link as it wouldn't build on netstandard1.0.

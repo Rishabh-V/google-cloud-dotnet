@@ -113,6 +113,27 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
             }
         }
 
+        [Theory]
+        [MemberData(nameof(TestDates))]
+        public async Task WriteDateThenRead_ShouldBeEqual_UseOptions(DateTime expectedDate)
+        {
+            // UseSpannerDateForDate = true, should read the date as SpannerDate struct.
+            using var connection = new SpannerConnection($"{_fixture.ConnectionString};UseSpannerDateForDate=true");
+            await connection.CreateInsertOrUpdateCommand(_fixture.TableName,
+                new SpannerParameterCollection
+                {
+                        new SpannerParameter("DateValue", SpannerDbType.Date, expectedDate)
+                }
+            ).ExecuteNonQueryAsync();
+
+            var dbDate = await connection.CreateSelectCommand($"SELECT DateValue FROM {_fixture.TableName}").ExecuteScalarAsync<SpannerDate>();
+            // Explicitly test the scenario in which CLR Type is not specified.
+            var date = await connection.CreateSelectCommand($"SELECT DateValue FROM {_fixture.TableName}").ExecuteScalarAsync<object>();
+            Assert.Equal(SpannerDate.FromDateTime(expectedDate), dbDate);
+            Assert.True(date is SpannerDate);
+            Assert.Equal(SpannerDate.FromDateTime(expectedDate), (SpannerDate)date);
+        }
+
         public static IEnumerable<object[]> TestTimestamps =>
             new List<object[]>
             {
