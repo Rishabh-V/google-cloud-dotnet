@@ -1,4 +1,4 @@
-﻿// Copyright 2018 Google LLC
+﻿// Copyright 2022 Google LLC
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 using Google.Api.Gax;
 using Google.Api.Gax.ResourceNames;
 using Google.Cloud.ClientTesting;
+using Google.Cloud.Spanner.Admin.Database.V1;
 using Google.Cloud.Spanner.Admin.Instance.V1;
 using Google.Cloud.Spanner.Common.V1;
 using Google.Cloud.Spanner.V1.Internal.Logging;
@@ -24,36 +25,36 @@ using System;
 namespace Google.Cloud.Spanner.Data.CommonTesting
 {
     /// <summary>
-    /// A database created on-demand for testing. This is never dropped, partly as it's hard to know when to do so.
+    /// A database with PostgreSQL dialect created on-demand for testing. This is never dropped, partly as it's hard to know when to do so.
     /// (This may be used by multiple fixtures, each created and then disposed, within the same test run.)
     /// A tool is provided to clean up test databases.
     /// </summary>
-    public class SpannerTestDatabase
+    public class SpannerTestPostgreSqlDatabase
     {
         private static readonly object s_lock = new object();
-        private static SpannerTestDatabase s_instance = null;
+        private static SpannerTestPostgreSqlDatabase s_instance = null;
 
         /// <summary>
         /// Fetches the database, creating it if necessary.
         /// </summary>
         /// <param name="projectId">The project ID to use, typically from a fixture.</param>
-        public static SpannerTestDatabase GetInstance(string projectId)
+        public static SpannerTestPostgreSqlDatabase GetInstance(string projectId)
         {
             lock (s_lock)
             {
                 if (s_instance == null)
                 {
-                    s_instance = new SpannerTestDatabase(projectId);
+                    s_instance = new SpannerTestPostgreSqlDatabase(projectId);
                 }
                 else if (s_instance.ProjectId != projectId)
                 {
-                    throw new ArgumentException($"A database for project ID {s_instance.ProjectId} has already been created; this test requested {projectId}");
+                    throw new ArgumentException($"A PostgreSQL database for project ID {s_instance.ProjectId} has already been created; this test requested {projectId}");
                 }
                 return s_instance;
             }
         }
 
-        private static readonly string s_generatedDatabaseName = IdGenerator.FromDateTime(prefix: "testdb_", pattern: "yyyyMMdd't'HHmmss");
+        private static readonly string s_generatedDatabaseName = IdGenerator.FromDateTime(prefix: "testdb_pg_", pattern: "yyyyMMdd't'HHmmss");
 
         public string SpannerHost { get; } = GetEnvironmentVariableOrDefault("TEST_SPANNER_HOST", null);
         public string SpannerPort { get; } = GetEnvironmentVariableOrDefault("TEST_SPANNER_PORT", null);
@@ -77,7 +78,7 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
         public DatabaseName DatabaseName { get; }
         internal SpannerClientCreationOptions SpannerClientCreationOptions { get; }
 
-        private SpannerTestDatabase(string projectId)
+        private SpannerTestPostgreSqlDatabase(string projectId)
         {
             TestLogger.Install();
 
@@ -101,12 +102,8 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
             MaybeCreateInstanceOnEmulator(projectId);
             if (Fresh)
             {
-                using (var connection = new SpannerConnection(NoDbConnectionString))
-                {
-                    var createCmd = connection.CreateDdlCommand($"CREATE DATABASE {SpannerDatabase}");
-                    createCmd.ExecuteNonQuery();
-                    Logger.DefaultLogger.Debug($"Created database {SpannerDatabase}");
-                }
+                CreatePostgreSqlDatabase();
+                Logger.DefaultLogger.Debug($"Created database {SpannerDatabase} with PostgreSql dialect.");
             }
             else
             {
@@ -154,6 +151,32 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
             }
         }
 
+        private void CreatePostgreSqlDatabase()
+        {
+            DatabaseAdminClient databaseAdminClient = DatabaseAdminClient.Create();
+            CreateDatabaseRequest createDatabaseRequest = new CreateDatabaseRequest
+            {
+                CreateStatement = $"CREATE DATABASE {SpannerDatabase}",
+                DatabaseDialect = DatabaseDialect.Postgresql,
+                ParentAsInstanceName = InstanceName.FromProjectInstance(ProjectId, SpannerInstance)
+            };
+
+            try
+            {
+                var operation = databaseAdminClient.CreateDatabase(createDatabaseRequest);
+                var completedResponse = operation.PollUntilCompleted();
+                if (completedResponse.IsFaulted)
+                {
+                    Console.WriteLine($"Error while creating PostgreSQL database: {completedResponse.Exception}");
+                    throw completedResponse.Exception;
+                }
+            }
+            catch (RpcException e) when (e.StatusCode == StatusCode.AlreadyExists)
+            {
+                // Ignore.
+            }
+        }
+
         public SpannerConnection GetConnection() => new SpannerConnection(ConnectionString);
 
         // Creates a SpannerConnection with a specific logger.
@@ -161,3 +184,4 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
             new SpannerConnection(new SpannerConnectionStringBuilder(ConnectionString) { SessionPoolManager = SessionPoolManager.Create(new V1.SessionPoolOptions(), logger) });
     }
 }
+

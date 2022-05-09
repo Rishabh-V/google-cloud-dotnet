@@ -27,9 +27,10 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
         protected override void CreateTable()
         {
             ExecuteDdl($@"CREATE TABLE {TableName} (
-                                            DateValue      DATE,
-                                            TimestampValue TIMESTAMPTZ,
-                                            PRIMARY KEY (DateValue))");
+                                            id BIGINT NOT NULL,
+                                            datevalue DATE,
+                                            timestampvalue TIMESTAMPTZ,
+                                            PRIMARY KEY (id))");
         }
     }
 }

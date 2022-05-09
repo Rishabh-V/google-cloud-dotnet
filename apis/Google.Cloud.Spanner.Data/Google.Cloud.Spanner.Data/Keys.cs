@@ -312,8 +312,8 @@ namespace Google.Cloud.Spanner.Data
 
         private static ListValue ToListValue(SpannerParameterCollection parameters)
         {
-            // TODO: We don't have connection available here. Use Default?
-            SpannerConversionOptions options = SpannerConversionOptions.Default;
+            // There is no access to Connection here, hence keeping it as it is, rather than passing Default. 
+            SpannerConversionOptions options = null;
             return new ListValue
             {
                 Values =

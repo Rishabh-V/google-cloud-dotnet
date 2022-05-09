@@ -172,22 +172,6 @@ namespace Google.Cloud.Spanner.Data
                         return new Value { StringValue = Convert.ToInt64(value, InvariantCulture)
                             .ToString(InvariantCulture) };
                 case TypeCode.Float64:
-                    // We can have double, float and decimal values here. Options apply only for decimal.
-                    // Float64 column on Spanner database expects NumberValue of Value.
-                    // Whereas NUMERIC column on Spanner database expects StringValue of Value.
-                    // So, to keep the changes backward compatible and working for all scenarios, populate both properties.
-                    if (value is decimal decimalValue && options != null && options.UsePgNumericForDecimal)
-                    {
-                        // PG dialect is yet to be tested.
-                        return Value.ForString(V1.PgNumeric.FromDecimal(decimalValue).ToString());
-                    }
-                    if (value is decimal decValue && options != null && options.UseSpannerNumericForDecimal)
-                    {
-                        // This works with Numeric type column, but fails with Float64 column.
-                        // TODO: Check if Truncate is right value to use.
-                        return Value.ForString(V1.SpannerNumeric.FromDecimal(decValue, LossOfPrecisionHandling.Truncate).ToString());
-                    }
-                    // This works with Float64 type column, but fails with Numeric column.
                     return new Value { NumberValue = Convert.ToDouble(value, InvariantCulture) };
                 case TypeCode.Timestamp:
                     return new Value

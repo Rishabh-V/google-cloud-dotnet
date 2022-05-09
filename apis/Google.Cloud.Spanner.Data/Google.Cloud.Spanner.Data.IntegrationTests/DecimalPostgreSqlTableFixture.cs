@@ -27,9 +27,10 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
         protected override void CreateTable()
         {
             ExecuteDdl($@"CREATE TABLE {TableName} (
-                                            k bigint not null,
-                                            decimalvalue numeric,
-                                            PRIMARY KEY (k))");
+                                            id BIGINT NOT NULL,
+                                            decimalvalue FLOAT8,
+                                            numericvalue NUMERIC,
+                                            PRIMARY KEY (id))");
         }
     }
 }

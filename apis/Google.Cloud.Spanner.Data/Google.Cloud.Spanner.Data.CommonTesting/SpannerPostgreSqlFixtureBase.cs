@@ -19,16 +19,16 @@ using Google.Cloud.Spanner.V1.Internal.Logging;
 namespace Google.Cloud.Spanner.Data.CommonTesting
 {
     /// <summary>
-    /// Base classes for test fixtures for Spanner PostgreSQL.
+    /// Base classes for test fixtures for Spanner PostgreSQL database.
     /// </summary>
     public abstract class SpannerPostgreSqlFixtureBase : CloudProjectFixtureBase
     {
-        public SpannerTestDatabase Database { get; }
+        public SpannerTestPostgreSqlDatabase Database { get; }
 
         public SpannerPostgreSqlFixtureBase()
         {
             GrpcInfo.EnableSubchannelCounting();
-            Database = SpannerTestDatabase.GetInstance(ProjectId, Admin.Database.V1.DatabaseDialect.Postgresql);
+            Database = SpannerTestPostgreSqlDatabase.GetInstance(ProjectId);
         }
 
         public DatabaseName DatabaseName => Database.DatabaseName;

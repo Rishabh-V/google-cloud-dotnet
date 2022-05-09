@@ -154,6 +154,29 @@ namespace Google.Cloud.Spanner.Data
             return Value;
         }
 
+        internal SpannerDbType ConfiguredSpannerDbType(SpannerConversionOptions options)
+        {
+            // Only if SpannerDbType of parameter is not explicitly provided by user.
+            if (_spannerDbType == null)
+            {
+                if (Value is decimal)
+                {
+                    // User needs to set the right dialect.
+                    if (options != null && options.UseSpannerNumericForDecimal)
+                    {
+                        return SpannerDbType.Numeric;
+                    }
+                    else if (options != null && options.UsePgNumericForDecimal)
+                    {
+                        return SpannerDbType.PgNumeric;
+                    }
+                }
+            }
+
+            // If we are here, use defaults.
+            return SpannerDbType;
+        }
+
         /// <inheritdoc />
         public override void ResetDbType()
         {
