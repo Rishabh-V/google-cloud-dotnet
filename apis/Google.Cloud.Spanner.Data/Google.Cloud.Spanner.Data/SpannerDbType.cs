@@ -335,6 +335,10 @@ namespace Google.Cloud.Spanner.Data
             {
                 return Timestamp;
             }
+            if (type == typeof(SpannerDate))
+            {
+                return Date;
+            }
             if (type == typeof(float) || type == typeof(double) || type == typeof(decimal))
             {
                 return Float64;

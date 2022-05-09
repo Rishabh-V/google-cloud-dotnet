@@ -254,7 +254,7 @@ namespace Google.Cloud.Spanner.Data
             foreach (var parameter in _innerList)
             {
                 valueDictionary[GetCorrectedParameterName(parameter.ParameterName)]
-                    = parameter.ConfiguredSpannerDbType(options).ToProtobufValue(parameter.GetValidatedValue(), options);
+                    = parameter.GetConfiguredSpannerDbType(options).ToProtobufValue(parameter.GetValidatedValue(), options);
             }
         }
 
@@ -263,7 +263,7 @@ namespace Google.Cloud.Spanner.Data
             foreach (var parameter in _innerList)
             {
                 typeDictionary[GetCorrectedParameterName(parameter.ParameterName)]
-                    = parameter.ConfiguredSpannerDbType(options).ToProtobufType();
+                    = parameter.GetConfiguredSpannerDbType(options).ToProtobufType();
             }
         }
 

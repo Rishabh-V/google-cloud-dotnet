@@ -101,15 +101,20 @@ namespace Google.Cloud.Spanner.Data
         }
 
         /// <summary>
-        /// Option to change between the default handling of Date type values (return <see cref="DateTime">DateTime</see>) or
-        /// the non-standard handling (return <see cref="SpannerDate"/>).
+        /// Option to change the ClrType used for the handling of Date type values. By default, <see cref="DateTime"/>
+        /// is used to handle Date type values. By specifying this option, <see cref="SpannerDate"/> will be used to handle Date
+        /// type values, if <see cref="SpannerDbType"/> property of <see cref="SpannerParameter"/> is not explicitly specified while
+        /// working with Date type column.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// If this is <c>false</c> (the default), <see cref="DateTime"/> will be used to return the value of Date type column.
+        /// If this is <c>false</c> (the default), <see cref="DateTime"/> will be used to handle the value of Date type column.
         /// </para>
         /// <para>
-        /// If this is <c>true</c>, <see cref="SpannerDate"/> will be used to return the value of Date type column.
+        /// If this is <c>true</c>, <see cref="SpannerDate"/> will be used to handle the value of Date type column.
+        /// </para> 
+        /// <para>
+        /// This property corresponds with the value of the "UseSpannerDateForDate" part of the connection string.
         /// </para>
         /// </remarks>
         public bool UseSpannerDateForDate
@@ -119,16 +124,22 @@ namespace Google.Cloud.Spanner.Data
         }
 
         /// <summary>
-        /// Option to change between the default handling of decimal values (use <see cref="SpannerDbType.Float64"/>) or
-        /// the standard handling (use <see cref="SpannerDbType.Numeric"/>) in Google Standard SQL dialect.
-        /// This option should be used while working with Spanner Google Standard SQL (GSQL) dialect.
+        /// Option to change the underlying ClrType and DbType used for the handling of decimal values. By default, <see cref="double"/>
+        /// and <see cref="SpannerDbType.Float64"/> are used to handle decimal values. By specifying this option, <see cref="SpannerNumeric"/>
+        /// and <see cref="SpannerDbType.Numeric"/> will be used to handle decimal values, if <see cref="SpannerDbType"/>
+        /// property of <see cref="SpannerParameter"/> is not explicitly specified while working with decimal column. Setting this option
+        /// on Float64 column will throw <see cref="SpannerException"/>. This option should be used if decimal data intends to be used with
+        /// Numeric column in Spanner Google Standard SQL (GSQL) dialect.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// If this is <c>false</c> (the default), <see cref="SpannerDbType.Float64"/> will be used to store and return the decimal values.
+        /// If this is <c>false</c> (the default), <see cref="SpannerDbType.Float64"/> will be used to handle the decimal values.
         /// </para>
         /// <para>
-        /// If this is <c>true</c>, <see cref="SpannerDbType.Numeric"/> will be used to store and return the decimal values.
+        /// If this is <c>true</c>, <see cref="SpannerDbType.Numeric"/> will be used to handle the decimal values.
+        /// </para> 
+        /// <para>
+        /// This property corresponds with the value of the "UseSpannerNumericForDecimal" part of the connection string.
         /// </para>
         /// </remarks>
         public bool UseSpannerNumericForDecimal
@@ -137,19 +148,23 @@ namespace Google.Cloud.Spanner.Data
             set => this[UseSpannerNumericForDecimalKeyword] = value.ToString(); // Always "True" or "False", regardless of culture.
         }
 
-        // PostgreSQL dialect doesn't have Float64, hence used Float only
-
         /// <summary>
-        /// Option to change between the default handling of decimal values <c>Float</c> or
-        /// the standard handling (use <see cref="SpannerDbType.PgNumeric"/>) in PostgreSQL dialect.
-        /// This option should be used while working with Spanner PostgreSQL dialect.
+        /// Option to change the underlying ClrType and DbType used for the handling of decimal values. By default, <see cref="double"/>
+        /// and <see cref="SpannerDbType.Float64"/> are used to handle decimal values. By specifying this option, <see cref="PgNumeric"/>
+        /// and <see cref="SpannerDbType.PgNumeric"/> will be used to handle decimal values, if <see cref="SpannerDbType"/>
+        /// property of <see cref="SpannerParameter"/> is not explicitly specified while working with decimal column. Setting this option
+        /// on Float64 column will throw <see cref="SpannerException"/>. This option should be used if decimal data intends to be used with
+        /// Numeric column in Spanner PostgreSQL dialect.
         /// </summary>
         /// <remarks>
         /// <para>
-        /// If this is <c>false</c> (the default), <c>Float</c> will be used to store and return the decimal values.
+        /// If this is <c>false</c> (the default), <see cref="SpannerDbType.Float64"/> will be used to handle the decimal values.
         /// </para>
         /// <para>
-        /// If this is <c>true</c>, <see cref="SpannerDbType.PgNumeric"/> will be used to store and return the decimal values.
+        /// If this is <c>true</c>, <see cref="SpannerDbType.PgNumeric"/> will be used to handle the decimal values.
+        /// </para> 
+        /// <para>
+        /// This property corresponds with the value of the "UsePgNumericForDecimal" part of the connection string.
         /// </para>
         /// </remarks>
         public bool UsePgNumericForDecimal
