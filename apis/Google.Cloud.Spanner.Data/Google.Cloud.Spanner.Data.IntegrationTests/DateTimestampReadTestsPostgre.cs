@@ -21,12 +21,12 @@ using Xunit;
 
 namespace Google.Cloud.Spanner.Data.IntegrationTests
 {
-    [Collection(nameof(DateTimestampPostgreSqlTableFixture))]
-    public class DateTimestampReadPostgreSqlTests
+    [Collection(nameof(DateTimestampTableFixturePostgre))]
+    public class DateTimestampReadTestsPostgre
     {
-        private readonly DateTimestampPostgreSqlTableFixture _fixture;
+        private readonly DateTimestampTableFixturePostgre _fixture;
 
-        public DateTimestampReadPostgreSqlTests(DateTimestampPostgreSqlTableFixture fixture) =>
+        public DateTimestampReadTestsPostgre(DateTimestampTableFixturePostgre fixture) =>
             _fixture = fixture;
 
         private static bool[] s_readWriteAsDateTime = new[]

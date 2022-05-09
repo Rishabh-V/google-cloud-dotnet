@@ -21,10 +21,10 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
     /// A table fixture that covers all Spanner PostgreSQL types. The fixture doesn't populate any data,
     /// but tests should not depend on the table being empty as other tests may modify it.
     /// </summary>
-    [CollectionDefinition(nameof(AllTypesPostgreSqlTableFixture))]
-    public class AllTypesPostgreSqlTableFixture : SpannerPostgreSqlTableFixture, ICollectionFixture<AllTypesPostgreSqlTableFixture>
+    [CollectionDefinition(nameof(AllTypesTableFixturePostgre))]
+    public class AllTypesTableFixturePostgre : SpannerTableFixturePostgre, ICollectionFixture<AllTypesTableFixturePostgre>
     {
-        public AllTypesPostgreSqlTableFixture() : base("TypesTable")
+        public AllTypesTableFixturePostgre() : base("TypesTable")
         {
         }
 

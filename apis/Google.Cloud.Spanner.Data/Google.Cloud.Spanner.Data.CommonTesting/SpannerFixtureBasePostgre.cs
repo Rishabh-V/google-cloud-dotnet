@@ -21,14 +21,14 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
     /// <summary>
     /// Base classes for test fixtures for Spanner PostgreSQL database.
     /// </summary>
-    public abstract class SpannerPostgreSqlFixtureBase : CloudProjectFixtureBase
+    public abstract class SpannerFixtureBasePostgre : CloudProjectFixtureBase
     {
-        public SpannerTestPostgreSqlDatabase Database { get; }
+        public SpannerTestDatabasePostgre Database { get; }
 
-        public SpannerPostgreSqlFixtureBase()
+        public SpannerFixtureBasePostgre()
         {
             GrpcInfo.EnableSubchannelCounting();
-            Database = SpannerTestPostgreSqlDatabase.GetInstance(ProjectId);
+            Database = SpannerTestDatabasePostgre.GetInstance(ProjectId);
         }
 
         public DatabaseName DatabaseName => Database.DatabaseName;

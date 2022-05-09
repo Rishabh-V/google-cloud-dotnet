@@ -19,11 +19,11 @@ namespace Google.Cloud.Spanner.Data.CommonTesting
     /// <summary>
     /// Base class for test fixtures for PostgreSQL tables.
     /// </summary>
-    public abstract class SpannerPostgreSqlTableFixture : SpannerPostgreSqlFixtureBase
+    public abstract class SpannerTableFixturePostgre : SpannerFixtureBasePostgre
     {
         public string TableName { get; }
 
-        public SpannerPostgreSqlTableFixture(string tableName)
+        public SpannerTableFixturePostgre(string tableName)
         {
             TableName = tableName;
             if (Database.Fresh)

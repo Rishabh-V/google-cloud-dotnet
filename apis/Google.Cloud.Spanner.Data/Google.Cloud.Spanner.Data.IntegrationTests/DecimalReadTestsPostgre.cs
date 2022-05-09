@@ -19,12 +19,12 @@ using Xunit;
 
 namespace Google.Cloud.Spanner.Data.IntegrationTests
 {
-    [Collection(nameof(DecimalPostgreSqlTableFixture))]
-    public class DecimalReadPostgreSqlTests
+    [Collection(nameof(DecimalTableFixturePostgre))]
+    public class DecimalReadTestsPostgre
     {
-        private readonly DecimalPostgreSqlTableFixture _fixture;
+        private readonly DecimalTableFixturePostgre _fixture;
 
-        public DecimalReadPostgreSqlTests(DecimalPostgreSqlTableFixture fixture) =>
+        public DecimalReadTestsPostgre(DecimalTableFixturePostgre fixture) =>
             _fixture = fixture;
 
         public static IEnumerable<object[]> TestDecimals =>

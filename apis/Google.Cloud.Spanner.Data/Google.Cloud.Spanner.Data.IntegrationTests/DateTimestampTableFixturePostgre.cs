@@ -1,4 +1,4 @@
-﻿// Copyright 2022 Google LLC
+﻿// Copyright 2020 Google LLC
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,10 +17,10 @@ using Xunit;
 
 namespace Google.Cloud.Spanner.Data.IntegrationTests
 {
-    [CollectionDefinition(nameof(DecimalPostgreSqlTableFixture))]
-    public class DecimalPostgreSqlTableFixture : SpannerPostgreSqlTableFixture, ICollectionFixture<DecimalPostgreSqlTableFixture>
+    [CollectionDefinition(nameof(DateTimestampTableFixturePostgre))]
+    public class DateTimestampTableFixturePostgre : SpannerTableFixturePostgre, ICollectionFixture<DateTimestampTableFixturePostgre>
     {
-        public DecimalPostgreSqlTableFixture() : base("DecimalTest")
+        public DateTimestampTableFixturePostgre() : base("DateTimestampTest")
         {
         }
 
@@ -28,8 +28,8 @@ namespace Google.Cloud.Spanner.Data.IntegrationTests
         {
             ExecuteDdl($@"CREATE TABLE {TableName} (
                                             id BIGINT NOT NULL,
-                                            decimalvalue FLOAT8,
-                                            numericvalue NUMERIC,
+                                            datevalue DATE,
+                                            timestampvalue TIMESTAMPTZ,
                                             PRIMARY KEY (id))");
         }
     }
