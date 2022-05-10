@@ -172,10 +172,9 @@ namespace Google.Cloud.Spanner.Data
                         return SpannerDbType.PgNumeric;
                     }
                 }
-                if (Value is DateTime && options != null && options.UseSpannerDateForDate)
-                {
-                    return SpannerDbType.Date;
-                }
+                // Currently, default SpannerDbType for DateTime ClrType is Timestamp.
+                // If SpannerDate ClrType is used, it corresponds to SpannerDbType.Date.
+                // No change to this, if SpannerDbType is not provided explicitly.                
             }
 
             // If we are here, use defaults.

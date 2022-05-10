@@ -214,6 +214,7 @@ namespace Google.Cloud.Spanner.Data
                         return typeof(double);
                     case TypeCode.Timestamp:
                     case TypeCode.Date:
+                        // To keep the code backward compatible, SpannerDate is used for Date based on options.
                         return typeof(DateTime);
                     case TypeCode.String:
                         return typeof(string);
