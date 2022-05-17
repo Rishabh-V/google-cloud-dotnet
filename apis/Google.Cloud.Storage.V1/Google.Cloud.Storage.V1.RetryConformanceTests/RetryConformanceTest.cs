@@ -75,15 +75,15 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
             {
                 foreach (string instruction in testCase.Instructions)
                 {
-                    foreach (Method method in test.Methods)
-                    {
+                foreach (Method method in test.Methods)
+                {
                         // TODO: Remove this if condition, when the mapping dictionary is completely and correctly populated.
                         if (method.Name.Contains("hmacKey.list"))
                         {
                             await RunTestCase(instruction, method, expectSuccess);
-                        }
-                    }
                 }
+            }
+        }
             }
         }
 
@@ -203,20 +203,20 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
             // Just to proceed with testing for now.
             _ => new MethodInvocation(s_clientType.GetMethod(nameof(StorageClient.GetBucket)), false, true, false, false, false, false, false),
         };
-
+            
         private async Task<TestResponse> GetRetryTest(string id)
-        {
+            {
             HttpResponseMessage response = await _httpClient.GetAsync($"retry_test/{id}");
             response.EnsureSuccessStatusCode();
             var responseMessage = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<TestResponse>(responseMessage);
-        }
+            }
 
         private async Task DeleteRetryTest(string id)
-        {
+            {
             HttpResponseMessage response = await _httpClient.DeleteAsync($"retry_test/{id}");
             response.EnsureSuccessStatusCode();
-        }
+            }
 
         private async Task<StorageResources> CreateStorageResources(Method method)
         {
@@ -244,16 +244,16 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
                     AccessId = hmacKey.Metadata.AccessId;
                     result.Add(new StorageResource(Resource.HmacKey, hmacKey.Secret));
                 }
-
+            
                 if (item.ToString().Equals("NOTIFICATION", StringComparison.OrdinalIgnoreCase))
                 {
                     var config = new Notification { Topic = $"//pubsub.googleapis.com/{Topic}", PayloadFormat = "JSON_API_V1" };
                     var notification = _storageClient.CreateNotification(bucket, config);
                     result.Add(new StorageResource(Resource.Notification, notification.Id));
-                }
+        }
 
                 if (item.ToString().Equals("OBJECT", StringComparison.OrdinalIgnoreCase))
-                {
+        {
                     using var stream = File.OpenRead(FilePath);
                     var objectCreated = _storageClient.UploadObject(bucket, objectName, "application/json", stream);
                     result.Add(new StorageResource(Resource.Object, objectCreated.Name));
@@ -274,7 +274,7 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
         {
             bool contains = _storageClient.Service.HttpClient.DefaultRequestHeaders.Contains(header);
             if (contains)
-            {
+        {
                 // Remove.
                 _storageClient.Service.HttpClient.DefaultRequestHeaders.Remove(header);
             }
@@ -288,14 +288,14 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
             {
                 var token = response.Instructions.First().Value;
                 if (token?.First is JProperty first)
-                {
+        {
                     return first.Name;
                 }
             }
 
             return default;
         }
-
+            
         private void AddRetryIdHeader(string id)
         {
             AddHeader("x-retry-test-id", id);
@@ -304,7 +304,7 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
         private static StringContent GetBodyContent(string methodName, string instruction)
         {
             if (string.IsNullOrWhiteSpace(methodName) || string.IsNullOrWhiteSpace(instruction))
-            {
+        {
                 return null;
             }
 
