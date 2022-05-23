@@ -65,7 +65,7 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
         }
 
         [Theory, MemberData(nameof(RetryTestData))]
-        public async Task RetryTest(RetryTest test)
+        public void RetryTest(RetryTest test)
         {
             // Create a dictionary which maps method names with the Storage client delegate to be called.
             // May need to adjust based on wider set of methods.
@@ -319,10 +319,6 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
             return new StringContent(builder.ToString(), Encoding.UTF8, "application/json");
         }
 
-        private static string GetEnvironmentVariableOrDefault(string name, string defaultValue)
-        {
-            string value = Environment.GetEnvironmentVariable(name);
-            return string.IsNullOrEmpty(value) ? defaultValue : value;
-        }
+        public bool Completed { get; set; }
     }
 }
