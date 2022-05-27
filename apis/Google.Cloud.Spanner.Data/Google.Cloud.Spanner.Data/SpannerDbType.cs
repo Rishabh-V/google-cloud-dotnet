@@ -192,19 +192,11 @@ namespace Google.Cloud.Spanner.Data
                 case TypeCode.Int64:
                     return typeof(long);
                 case TypeCode.Float64:
-                    if (options != null)
-                    {
-                        return options.ConfiguredClrTypeForFloat64();
-                    }
-                    return typeof(double);
+                    return options.ConfiguredClrTypeForFloat64();
                 case TypeCode.Timestamp:
                     return typeof(DateTime);
                 case TypeCode.Date:
-                    if (options != null)
-                    {
-                        return options.ConfiguredClrTypeForDate();
-                    }
-                    return typeof(DateTime);
+                    return options.ConfiguredClrTypeForDate();
                 case TypeCode.String:
                     return typeof(string);
                 case TypeCode.Bytes:
@@ -230,7 +222,7 @@ namespace Google.Cloud.Spanner.Data
         /// <summary>
         /// The default <see cref="System.Type"/> for this Cloud Spanner type.
         /// </summary>
-        public System.Type DefaultClrType => GetConfiguredClrType(default);
+        public System.Type DefaultClrType => GetConfiguredClrType(SpannerConversionOptions.Default);
 
         /// <summary>
         /// Converts a <see cref="DbType"/> to the corresponding <see cref="SpannerDbType"/>

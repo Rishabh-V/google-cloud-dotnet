@@ -260,6 +260,7 @@ namespace Google.Cloud.Spanner.Data.Tests
             yield return new object[] { SpannerDbType.Date, GetSpannerConversionOptions(default), typeof(DateTime) };
 
             // Cases where we should see default mapping as default SpannerConversionOptions are used.
+            // Note: SpannerConversionOptions is never null for this method.
             yield return new object[] { SpannerDbType.Float64, SpannerConversionOptions.Default, typeof(double) };
             yield return new object[] { SpannerDbType.Numeric, SpannerConversionOptions.Default, typeof(SpannerNumeric) };
             yield return new object[] { SpannerDbType.PgNumeric, SpannerConversionOptions.Default, typeof(PgNumeric) };
