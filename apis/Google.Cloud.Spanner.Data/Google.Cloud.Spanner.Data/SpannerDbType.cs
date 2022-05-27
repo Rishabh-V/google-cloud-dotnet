@@ -46,7 +46,7 @@ namespace Google.Cloud.Spanner.Data
         public static SpannerDbType Int64 { get; } = new SpannerDbType(TypeCode.Int64);
 
         /// <summary>
-        /// 64 bit floating point number.
+        /// 64 bit floating point number. This is equivalent to Float8 in the PostgreSQL dialect.
         /// </summary>
         public static SpannerDbType Float64 { get; } = new SpannerDbType(TypeCode.Float64);
 
@@ -192,9 +192,18 @@ namespace Google.Cloud.Spanner.Data
                 case TypeCode.Int64:
                     return typeof(long);
                 case TypeCode.Float64:
+                    if (options != null)
+                    {
+                        return options.ConfiguredClrTypeForFloat64();
+                    }
                     return typeof(double);
                 case TypeCode.Timestamp:
+                    return typeof(DateTime);
                 case TypeCode.Date:
+                    if (options != null)
+                    {
+                        return options.ConfiguredClrTypeForDate();
+                    }
                     return typeof(DateTime);
                 case TypeCode.String:
                     return typeof(string);
@@ -315,6 +324,10 @@ namespace Google.Cloud.Spanner.Data
             if (typeof(IEnumerable<byte>).IsAssignableFrom(type))
             {
                 return Bytes;
+            }
+            if (type == typeof(SpannerDate))
+            {
+                return Date;
             }
             if (type == typeof(DateTime))
             {

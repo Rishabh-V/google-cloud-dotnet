@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Google.Cloud.Spanner.V1;
 using Google.Protobuf.WellKnownTypes;
 using System;
 using System.Collections.Generic;
@@ -230,6 +231,60 @@ namespace Google.Cloud.Spanner.Data.Tests
         public void CommitTimestampConversion_WrongType()
         {
             Assert.Throws<InvalidOperationException>(() => SpannerDbType.Date.ToProtobufValue(SpannerParameter.CommitTimestamp));
+        }
+
+        public static IEnumerable<object[]> ConfiguredClrTypes()
+        {
+            // Format : SpannerDbType, SpannerConversionOptions, expected ClrType.
+
+            // Cases where type mapping will determine the CLR type.
+            yield return new object[] { SpannerDbType.Float64, GetSpannerConversionOptions("Float64ToFloat"), typeof(float) };
+            yield return new object[] { SpannerDbType.Float64, GetSpannerConversionOptions("Float64ToDecimal"), typeof(decimal) };
+            yield return new object[] { SpannerDbType.Float64, GetSpannerConversionOptions("Float64ToDouble"), typeof(double) };
+            yield return new object[] { SpannerDbType.Float64, GetSpannerConversionOptions("Float64ToSpannerNumeric"), typeof(SpannerNumeric) };
+            yield return new object[] { SpannerDbType.Float64, GetSpannerConversionOptions("Float64ToPgNumeric"), typeof(PgNumeric) };
+            yield return new object[] { SpannerDbType.Date, GetSpannerConversionOptions("DateToDateTime"), typeof(DateTime) };
+            yield return new object[] { SpannerDbType.Date, GetSpannerConversionOptions("DateToSpannerDate"), typeof(SpannerDate) };
+
+            // Cases where type mapping is provided but will be ignored. (Only Float64 and Date is supported).
+            yield return new object[] { SpannerDbType.Numeric, GetSpannerConversionOptions("Float64ToFloat"), typeof(SpannerNumeric) };
+            yield return new object[] { SpannerDbType.PgNumeric, GetSpannerConversionOptions("Float64ToDecimal"), typeof(PgNumeric) };
+            yield return new object[] { SpannerDbType.Timestamp, GetSpannerConversionOptions("DateToDateTime"), typeof(DateTime) };
+            yield return new object[] { SpannerDbType.Timestamp, GetSpannerConversionOptions("DateToSpannerDate"), typeof(DateTime) };
+
+            // Cases where we should see default mapping as no type mapping is provided in the connection string.
+            yield return new object[] { SpannerDbType.Float64, GetSpannerConversionOptions(default), typeof(double) };
+            yield return new object[] { SpannerDbType.Numeric, GetSpannerConversionOptions(default), typeof(SpannerNumeric) };
+            yield return new object[] { SpannerDbType.PgNumeric, GetSpannerConversionOptions(default), typeof(PgNumeric) };
+            yield return new object[] { SpannerDbType.Timestamp, GetSpannerConversionOptions(default), typeof(DateTime) };
+            yield return new object[] { SpannerDbType.Date, GetSpannerConversionOptions(default), typeof(DateTime) };
+
+            // Cases where we should see default mapping as default SpannerConversionOptions are used.
+            yield return new object[] { SpannerDbType.Float64, SpannerConversionOptions.Default, typeof(double) };
+            yield return new object[] { SpannerDbType.Numeric, SpannerConversionOptions.Default, typeof(SpannerNumeric) };
+            yield return new object[] { SpannerDbType.PgNumeric, SpannerConversionOptions.Default, typeof(PgNumeric) };
+            yield return new object[] { SpannerDbType.Timestamp, SpannerConversionOptions.Default, typeof(DateTime) };
+            yield return new object[] { SpannerDbType.Date, SpannerConversionOptions.Default, typeof(DateTime) };
+        }
+
+        private static SpannerConversionOptions GetSpannerConversionOptions(string spannerToClrTypeMappings)
+        {
+            var connectionStringBuilder = string.IsNullOrWhiteSpace(spannerToClrTypeMappings)
+                ? new SpannerConnectionStringBuilder()
+                : new SpannerConnectionStringBuilder
+                {
+                    SpannerToClrTypeDefaultMappings = spannerToClrTypeMappings
+                };
+
+            return SpannerConversionOptions.ForConnectionStringBuilder(connectionStringBuilder);
+        }
+
+        [Theory]
+        [MemberData(nameof(ConfiguredClrTypes))]
+        internal void GetConfiguredClrType(SpannerDbType dbType, SpannerConversionOptions options, System.Type expectedType)
+        {
+            var actualType = dbType.GetConfiguredClrType(options);
+            Assert.Equal(expectedType, actualType);
         }
     }
 }

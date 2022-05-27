@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
+
 namespace Google.Cloud.Spanner.Data
 {
     /// <summary>
@@ -19,21 +23,33 @@ namespace Google.Cloud.Spanner.Data
     /// </summary>
     internal class SpannerConversionOptions
     {
-        // Predefined instances; these will change as the class grows, but hopefully
-        // for most cases we can avoid creating new instances.
-        private static readonly SpannerConversionOptions s_useDBNullForNull = new SpannerConversionOptions(true);
-        private static readonly SpannerConversionOptions s_useClrDefaultForNull = new SpannerConversionOptions(false);
-
-        internal static SpannerConversionOptions Default { get; } = s_useDBNullForNull;
+        internal static SpannerConversionOptions Default { get; } = new SpannerConversionOptions(true, default, default);
 
         /// <summary>
         /// True to return DBNull.Value for null values; false to return a null reference.
         /// </summary>
         internal bool UseDBNull { get; }
 
-        private SpannerConversionOptions(bool useDBNull)
+        internal ConcurrentDictionary<System.Type, SpannerDbType> ClrToSpannerTypeMappings { get; }
+
+        internal ConcurrentDictionary<SpannerDbType, System.Type> SpannerToClrTypeMappings { get; }
+
+        private SpannerConversionOptions(bool useDBNull,
+            IDictionary<System.Type, SpannerDbType> defaultClrToSpannerMappings,
+            IDictionary<SpannerDbType, System.Type> defaultSpannerToClrMappings)
         {
             UseDBNull = useDBNull;
+            ClrToSpannerTypeMappings = (ConcurrentDictionary<System.Type, SpannerDbType>)(defaultClrToSpannerMappings ?? new ConcurrentDictionary<System.Type, SpannerDbType>
+            {
+                [typeof(decimal)] = SpannerDbType.Float64,
+                [typeof(DateTime)] = SpannerDbType.Timestamp
+            });
+
+            SpannerToClrTypeMappings = (ConcurrentDictionary<SpannerDbType, System.Type>)(defaultSpannerToClrMappings ?? new ConcurrentDictionary<SpannerDbType, System.Type>
+            {
+                [SpannerDbType.Float64] = typeof(double),
+                [SpannerDbType.Date] = typeof(DateTime)
+            });
         }
 
         /// <summary>
@@ -46,6 +62,35 @@ namespace Google.Cloud.Spanner.Data
         /// Determines the right conversion options to use based on the connection string of the given connection string builder.
         /// </summary>
         internal static SpannerConversionOptions ForConnectionStringBuilder(SpannerConnectionStringBuilder builder) =>
-            builder == null ? Default : builder.UseClrDefaultForNull ? s_useClrDefaultForNull : s_useDBNullForNull;
+            builder == null ? Default :
+            new SpannerConversionOptions(!builder.UseClrDefaultForNull, builder.ClrToSpannerTypeMappings, builder.SpannerToClrTypeMappings);
+
+        internal SpannerDbType ConfiguredSpannerTypeForDecimal() => ConfiguredSpannerDbType(typeof(decimal)) ?? SpannerDbType.Float64;
+
+        internal SpannerDbType ConfiguredSpannerTypeForDateTime() => ConfiguredSpannerDbType(typeof(DateTime)) ?? SpannerDbType.Timestamp;
+
+        private SpannerDbType ConfiguredSpannerDbType(System.Type type)
+        {
+            if (ClrToSpannerTypeMappings.TryGetValue(type, out var spannerDbType))
+            {
+                return spannerDbType;
+            }
+
+            return default;
+        }
+
+        internal System.Type ConfiguredClrTypeForDate() => ConfiguredClrType(SpannerDbType.Date) ?? typeof(DateTime);
+
+        internal System.Type ConfiguredClrTypeForFloat64() => ConfiguredClrType(SpannerDbType.Float64) ?? typeof(double);
+
+        private System.Type ConfiguredClrType(SpannerDbType dbType)
+        {
+            if (SpannerToClrTypeMappings.TryGetValue(dbType, out var clrType))
+            {
+                return clrType;
+            }
+
+            return default;
+        }
     }
 }

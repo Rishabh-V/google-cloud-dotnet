@@ -13,13 +13,15 @@
 // limitations under the License.
 
 using Google.Api.Gax;
-using Google.Api.Gax.Grpc;
 using Google.Cloud.Spanner.Common.V1;
 using Google.Cloud.Spanner.V1;
 using Grpc.Core;
 using System;
+using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Data.Common;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Google.Cloud.Spanner.Data
@@ -46,15 +48,62 @@ namespace Google.Cloud.Spanner.Data
         /// </summary>
         internal const int DefaultMaxConcurrentStreamsLowWatermark = 20;
 
+        /// <summary>
+        /// The set of valid CLR to Spanner type mappings used to validate <see cref="ClrToSpannerTypeDefaultMappings"/>.
+        /// </summary>
+        internal static readonly HashSet<string> AllowedClrToSpannerTypeMappings = new HashSet<string>()
+        {
+            DecimalToFloat64,
+            DecimalToNumeric,
+            DecimalToPgNumeric,
+            DateTimeToDate,
+            DateTimeToTimestamp
+        };
+
+        /// <summary>
+        /// The set of valid Spanner to CLR type mappings used to validate <see cref="SpannerToClrTypeDefaultMappings"/>.
+        /// </summary>
+        internal static HashSet<string> AllowedSpannerToClrTypeMappings = new HashSet<string>()
+        {
+            Float64ToFloat,
+            Float64ToDouble,
+            Float64ToDecimal,
+            Float64ToSpannerNumeric,
+            Float64ToPgNumeric,
+            DateToDateTime,
+            DateToSpannerDate
+        };
+
         private const string CredentialFileKeyword = "CredentialFile";
         private const string DataSourceKeyword = "Data Source";
         private const string UseClrDefaultForNullKeyword = "UseClrDefaultForNull";
         private const string EnableGetSchemaTableKeyword = "EnableGetSchemaTable";
         private const string LogCommitStatsKeyword = "LogCommitStats";
         private const string EmulatorDetectionKeyword = "EmulatorDetection";
+        private const string ClrToSpannerTypeDefaultMappingsKeyword = "ClrToSpannerTypeDefaultMappings";
+        private const string SpannerToClrTypeDefaultMappingsKeyword = "SpannerToClrTypeDefaultMappings";
+
+        // Constants for CLR to Spanner type mappings.
+        private const string DecimalToFloat64 = "DecimalToFloat64";
+        private const string DecimalToNumeric = "DecimalToNumeric";
+        private const string DecimalToPgNumeric = "DecimalToPgNumeric";
+        private const string DateTimeToDate = "DateTimeToDate";
+        private const string DateTimeToTimestamp = "DateTimeToTimestamp";
+
+        // Constants for Spanner To CLR type mappings.
+        private const string Float64ToFloat = "Float64ToFloat";
+        private const string Float64ToDouble = "Float64ToDouble";
+        private const string Float64ToDecimal = "Float64ToDecimal";
+        private const string Float64ToSpannerNumeric = "Float64ToSpannerNumeric";
+        private const string Float64ToPgNumeric = "Float64ToPgNumeric";
+        private const string DateToSpannerDate = "DateToSpannerDate";
+        private const string DateToDateTime = "DateToDateTime";
 
         private InstanceName _instanceName;
         private DatabaseName _databaseName;
+
+        private ConcurrentDictionary<System.Type, SpannerDbType> _clrToSpannerMapping;
+        private ConcurrentDictionary<SpannerDbType, System.Type> _spannerToClrMapping;
 
         /// <summary>
         /// Optional path to a JSON Credential file. If a Credential is not supplied, Cloud Spanner
@@ -138,6 +187,186 @@ namespace Google.Cloud.Spanner.Data
             }
 
             return dataSource;
+        }
+
+        /// <summary>
+        /// Option to configure the default CLR type to SpannerDbType mapping. This option comes into picture
+        /// only if <see cref="SpannerDbType"/> and <see cref="System.Data.DbType"/> of the <see cref="SpannerParameter"/>
+        /// are not explicitly provided. Currently only <see cref="decimal"/> and <see cref="DateTime"/> CLR types are supported.
+        /// </summary>
+        /// <remarks>
+        /// The valid type mappings for decimal are: 
+        /// <para><c>DecimalToFloat64</c> - <see cref="decimal"/> CLR type will map to <see cref="SpannerDbType.Float64"/>, 
+        /// if <see cref="SpannerDbType"/> and <see cref="System.Data.DbType"/> is not explicitly provided for the <see cref="SpannerParameter"/>.
+        /// </para>
+        /// <para><c>DecimalToNumeric</c> - <see cref="decimal"/> CLR type will map to <see cref="SpannerDbType.Numeric"/>, 
+        /// if <see cref="SpannerDbType"/> and <see cref="System.Data.DbType"/> is not explicitly provided for the <see cref="SpannerParameter"/>. 
+        /// This should be used while working with Google Standard SQL dialect only.
+        /// </para>
+        /// <para><c>DecimalToPgNumeric</c> - <see cref="decimal"/> CLR type will map to <see cref="SpannerDbType.PgNumeric"/>, 
+        /// if <see cref="SpannerDbType"/> and <see cref="System.Data.DbType"/> is not explicitly provided for the <see cref="SpannerParameter"/>.
+        /// This should be used while working with PostgreSQL dialect only.
+        /// </para>
+        /// The valid type mappings for DateTime are: 
+        /// <para><c>DateTimeToDate</c> - <see cref="DateTime"/> CLR type will map to <see cref="SpannerDbType.Date"/>, 
+        /// if <see cref="SpannerDbType"/> and <see cref="System.Data.DbType"/> is not explicitly provided for the <see cref="SpannerParameter"/>.
+        /// </para>
+        /// <para><c>DateTimeToTimestamp</c> - <see cref="DateTime"/> CLR type will map to <see cref="SpannerDbType.Timestamp"/>, 
+        /// if <see cref="SpannerDbType"/> and <see cref="System.Data.DbType"/> is not explicitly provided for the <see cref="SpannerParameter"/>.
+        /// </para>
+        /// The mapping can be provided as comma separated values. Only one mapping for a type must be provided. 
+        /// Providing mutiple mapping for a type, or providing invalid mapping or providing whitespaces will result in <see cref="ArgumentException"/>. Few examples of valid values are:
+        /// <para>
+        /// DecimalToFloat64,DateTimeToDate
+        /// </para>
+        /// <para>
+        /// DecimalToNumeric,DateTimeToTimestamp
+        /// </para>
+        /// <para>
+        /// This property corresponds with the value of the "ClrToSpannerTypeDefaultMappings" part of the connection string.
+        /// </para>
+        /// </remarks>
+        public string ClrToSpannerTypeDefaultMappings
+        {
+            get => GetValueOrDefault(ClrToSpannerTypeDefaultMappingsKeyword);
+            set => this[ClrToSpannerTypeDefaultMappingsKeyword] = ValidatedClrToSpannerTypeMappings(value);
+        }
+
+        private string ValidatedClrToSpannerTypeMappings(string input)
+        {
+            // Empty string or null is an invalid type mapping.
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                throw new ArgumentException($"'{input}' cannot be null or empty for ${nameof(ClrToSpannerTypeDefaultMappings)}");
+            }
+
+            // Get all type mappings.
+            var mappings = input.Split(new char[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+            // Validate that mappings are valid.
+            if (mappings == null || !mappings.Any())
+            {
+                throw new ArgumentException($"'{input}' is not a valid value for ${nameof(ClrToSpannerTypeDefaultMappings)}");
+            }
+
+            // Validate that mapping, matches one of the pre-defined values.
+            var invalidMappings = mappings.Except(AllowedClrToSpannerTypeMappings, StringComparer.OrdinalIgnoreCase);
+            if (invalidMappings.Any())
+            {
+                throw new ArgumentException($"'{string.Join(",", invalidMappings)}' is not a valid value for ${nameof(ClrToSpannerTypeDefaultMappings)}");
+            }
+
+            // Check multiples for each type.
+            // Currently, we have Decimal and DateTime to check.
+            if (mappings.Count(j => j.StartsWith("Decimal", StringComparison.OrdinalIgnoreCase)) > 1)
+            {
+                throw new ArgumentException($"'{input}' is not a valid value as multiple mappings from Decimal to SpannerDbType are provided for ${nameof(ClrToSpannerTypeDefaultMappings)}");
+            }
+
+            if (mappings.Count(j => j.StartsWith("DateTime", StringComparison.OrdinalIgnoreCase)) > 1)
+            {
+                throw new ArgumentException($"'{input}' is not a valid value as multiple mappings from DateTime to SpannerDbType are provided for ${nameof(ClrToSpannerTypeDefaultMappings)}");
+            }
+
+            // If we reach here all is well. Return the input as validation passed.
+            return input;
+        }
+
+        /// <summary>
+        /// Option to configure the default SpannerDbType to CLR type mappings. This option comes into picture
+        /// only if CLR type of the value being read is not explicitly provided while reading the data from the database.
+        /// Currently only <see cref="SpannerDbType.Float64"/> and <see cref="SpannerDbType.Date"/> are supported.
+        /// </summary>        
+        /// <remarks>
+        /// The valid type mappings for Float64 are:
+        /// <para>
+        /// <c>Float64ToFloat</c> - <see cref="SpannerDbType.Float64"/> will map to <see cref="float"/>, 
+        /// if CLR type of the value being read is not explicitly provided.
+        /// </para>
+        /// <para>
+        /// <c>Float64ToDouble</c> - <see cref="SpannerDbType.Float64"/> will map to <see cref="double"/>, 
+        /// if CLR type of the value being read is not explicitly provided.
+        /// </para>
+        /// <para>
+        /// <c>Float64ToDecimal</c> - <see cref="SpannerDbType.Float64"/> will map to <see cref="decimal"/>, 
+        /// if CLR type of the value being read is not explicitly provided.
+        /// </para>
+        /// <para>
+        /// <c>Float64ToSpannerNumeric</c> - <see cref="SpannerDbType.Float64"/> will map to <see cref="SpannerNumeric"/>, 
+        /// if CLR type of the value being read is not explicitly provided. 
+        /// This should be used while working with Google Standard SQL dialect only.
+        /// </para>
+        /// <para>
+        /// <c>Float64ToPgNumeric</c> - <see cref="SpannerDbType.Float64"/> will map to <see cref="PgNumeric"/>, 
+        /// if CLR type of the value being read is not explicitly provided. 
+        /// This should be used while working with PostgreSQL SQL dialect only.
+        /// </para>
+        /// The valid type mappings for Date are: 
+        /// <para>
+        /// <c>DateToDateTime</c> - <see cref="SpannerDbType.Date"/> will map to <see cref="DateTime"/>, 
+        /// if CLR type of the value being read is not explicitly provided.
+        /// </para>
+        /// <para>
+        /// <c>DateToSpannerDate</c> - <see cref="SpannerDbType.Date"/> will map to <see cref="SpannerDate"/>, 
+        /// if CLR type of the value being read is not explicitly provided.
+        /// </para>
+        /// The mapping can be provided as comma separated values. Only one mapping for a SpannerDbType must be provided. 
+        /// Providing mutiple mapping for a type, or providing invalid mapping or providing whitespaces will result in <see cref="ArgumentException"/>. 
+        /// Few examples of valid values are:
+        /// <para>
+        /// Float64ToDecimal,DateToDateTime
+        /// </para>
+        /// <para>
+        /// Float64ToDouble,DateToSpannerDate
+        /// </para>
+        /// <para>
+        /// This property corresponds with the value of the "SpannerToClrTypeDefaultMappings" part of the connection string.
+        /// </para>
+        /// </remarks>
+        public string SpannerToClrTypeDefaultMappings
+        {
+            get => GetValueOrDefault(SpannerToClrTypeDefaultMappingsKeyword);
+            set => this[SpannerToClrTypeDefaultMappingsKeyword] = ValidatedSpannerToClrTypeMappings(value);
+        }
+
+        private string ValidatedSpannerToClrTypeMappings(string input)
+        {
+            // Empty string or null is an invalid type mapping.
+            if (string.IsNullOrWhiteSpace(input))
+            {
+                throw new ArgumentException($"'{input}' cannot be null or empty for ${nameof(SpannerToClrTypeDefaultMappings)}");
+            }
+
+            // Get all type mappings.
+            var mappings = input.Split(new char[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries);
+
+            // Validate that mappings are valid.
+            if (mappings == null || !mappings.Any())
+            {
+                throw new ArgumentException($"'{input}' is not a valid value for ${nameof(SpannerToClrTypeDefaultMappings)}");
+            }
+
+            // Validate that mapping matches one of the pre-defined values.
+            var invalidMappings = mappings.Except(AllowedSpannerToClrTypeMappings, StringComparer.OrdinalIgnoreCase);
+            if (invalidMappings.Any())
+            {
+                throw new ArgumentException($"'{string.Join(",", invalidMappings)}' is not a valid value for ${nameof(SpannerToClrTypeDefaultMappings)}");
+            }
+
+            // Check multiples for each type.
+            // Currently, we have Float64 and Date to check.
+            if (mappings.Count(j => j.StartsWith("Float64", StringComparison.OrdinalIgnoreCase)) > 1)
+            {
+                throw new ArgumentException($"'{input}' is not a valid value as multiple mappings from Float64 to CLR type are provided for ${nameof(SpannerToClrTypeDefaultMappings)}");
+            }
+
+            if (mappings.Count(j => j.StartsWith("Date", StringComparison.OrdinalIgnoreCase)) > 1)
+            {
+                throw new ArgumentException($"'{input}' is not a valid value as multiple mappings from Date to CLR type are provided for ${nameof(SpannerToClrTypeDefaultMappings)}");
+            }
+
+            // If we reach here, all is well. Return the input as validation passed.
+            return input;
         }
 
         // Note: EndPoint rather than Endpoint to avoid an unnecessary breaking change from V1.
@@ -424,7 +653,7 @@ namespace Google.Cloud.Spanner.Data
             {
                 return parsed >= minValue && parsed <= maxValue ? parsed : defaultValue;
             }
-            return defaultValue;            
+            return defaultValue;
         }
 
         private void SetInt32WithValidation(string key, int minValue, int maxValue, int value)
@@ -455,6 +684,14 @@ namespace Google.Cloud.Spanner.Data
                 {
                     value = ValidatedDataSource((string)value);
                 }
+                if (string.Equals(keyword, ClrToSpannerTypeDefaultMappingsKeyword, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = ValidatedClrToSpannerTypeMappings((string)value);
+                }
+                if (string.Equals(keyword, SpannerToClrTypeDefaultMappingsKeyword, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = ValidatedSpannerToClrTypeMappings((string)value);
+                }
                 base[keyword] = value;
             }
         }
@@ -467,5 +704,89 @@ namespace Google.Cloud.Spanner.Data
         /// is necessarily public.)
         /// </summary>
         internal Func<string, string> EnvironmentVariableProvider { get; set; }
+
+        /// <summary>
+        /// Consolidated strongly typed CLR to SpannerDbType mappings for easy usage.
+        /// This is a convenience internal property to avoid dealing with strings after parsing the options outside this class.
+        /// This will always return the latest and greatest mapping options or default mappings if the ClrToSpannerTypeDefaultMappings property is not set.
+        /// </summary>
+        internal ConcurrentDictionary<System.Type, SpannerDbType> ClrToSpannerTypeMappings => ParseClrToSpannerMappings();
+
+        private ConcurrentDictionary<System.Type, SpannerDbType> ParseClrToSpannerMappings()
+        {
+            // This dictionary is created only once.
+            // We will always have latest and greatest based on connection string options or will have defaults.
+            // Prefering correctness over laziness. With just few entries, performance shouldn't be an issue. 
+            _clrToSpannerMapping ??= new ConcurrentDictionary<System.Type, SpannerDbType>();
+            if (string.IsNullOrWhiteSpace(ClrToSpannerTypeDefaultMappings))
+            {
+                // Add default mappings.
+                _clrToSpannerMapping.AddOrUpdate(typeof(decimal), SpannerDbType.Float64, (type, dbType) => SpannerDbType.Float64);
+                _clrToSpannerMapping.AddOrUpdate(typeof(DateTime), SpannerDbType.Timestamp, (type, dbType) => SpannerDbType.Timestamp);
+                return _clrToSpannerMapping;
+            }
+
+            // If we are here, it means validated ClrToSpannerTypeDefaultMappings exist.
+            var mappings = ClrToSpannerTypeDefaultMappings.Split(new char[] { ',',';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var item in mappings)
+            {
+                // Discard pattern, primarily to simplify code using switch expressions.
+                _ = item switch
+                {
+                    DecimalToFloat64 => _clrToSpannerMapping.AddOrUpdate(typeof(decimal), SpannerDbType.Float64, (type, dbType) => SpannerDbType.Float64),
+                    DecimalToNumeric => _clrToSpannerMapping.AddOrUpdate(typeof(decimal), SpannerDbType.Numeric, (type, dbType) => SpannerDbType.Numeric),
+                    DecimalToPgNumeric => _clrToSpannerMapping.AddOrUpdate(typeof(decimal), SpannerDbType.PgNumeric, (type, dbType) => SpannerDbType.PgNumeric),
+                    DateTimeToDate => _clrToSpannerMapping.AddOrUpdate(typeof(DateTime), SpannerDbType.Date, (type, dbType) => SpannerDbType.Date),
+                    DateTimeToTimestamp => _clrToSpannerMapping.AddOrUpdate(typeof(DateTime), SpannerDbType.Timestamp, (type, dbType) => SpannerDbType.Timestamp),
+                    // We shouldn't come here post validation. We don't have a known mapping, if we reach here.
+                    _ => default
+                };
+            }
+
+            return _clrToSpannerMapping;
+        }
+
+        /// <summary>
+        /// Consolidated strongly typed SpannerDbType to CLR type mappings for easy usage.
+        /// This is a convenience internal property to avoid dealing with strings after parsing the options outside this class.
+        /// This will always return the latest and greatest mapping options or default mappings if the SpannerToClrTypeDefaultMappings property is not set.
+        /// </summary>
+        internal ConcurrentDictionary<SpannerDbType, System.Type> SpannerToClrTypeMappings => ParseSpannerToClrMappings();
+
+        private ConcurrentDictionary<SpannerDbType, System.Type> ParseSpannerToClrMappings()
+        {
+            // This dictionary is created only once.
+            // We will always have latest and greatest based on connection string options or will have defaults.
+            // Prefering correctness over laziness. With just few entries, performance shouldn't be an issue.
+            _spannerToClrMapping ??= new ConcurrentDictionary<SpannerDbType, System.Type>();
+            if (string.IsNullOrWhiteSpace(SpannerToClrTypeDefaultMappings))
+            {
+                // Add default mappings.
+                _spannerToClrMapping.AddOrUpdate(SpannerDbType.Float64, typeof(double), (dbType, type) => typeof(double));
+                _spannerToClrMapping.AddOrUpdate(SpannerDbType.Date, typeof(DateTime), (dbType, type) => typeof(DateTime));
+                return _spannerToClrMapping;
+            }
+
+            // If we are here, it means validated SpannerToClrTypeDefaultMappings exist.
+            var mappings = SpannerToClrTypeDefaultMappings.Split(new char[] { ',',';' }, StringSplitOptions.RemoveEmptyEntries);
+            foreach (var mapping in mappings)
+            {
+                // Discard pattern, primarily to simplify code using switch expressions.
+                _ = mapping switch
+                {
+                    Float64ToDecimal => _spannerToClrMapping.AddOrUpdate(SpannerDbType.Float64, typeof(decimal), (dbType, type) => typeof(decimal)),
+                    Float64ToDouble => _spannerToClrMapping.AddOrUpdate(SpannerDbType.Float64, typeof(double), (dbType, type) => typeof(double)),
+                    Float64ToFloat => _spannerToClrMapping.AddOrUpdate(SpannerDbType.Float64, typeof(float), (dbType, type) => typeof(float)),
+                    Float64ToSpannerNumeric => _spannerToClrMapping.AddOrUpdate(SpannerDbType.Float64, typeof(SpannerNumeric), (dbType, type) => typeof(SpannerNumeric)),
+                    Float64ToPgNumeric => _spannerToClrMapping.AddOrUpdate(SpannerDbType.Float64, typeof(PgNumeric), (dbType, type) => typeof(PgNumeric)),
+                    DateToDateTime => _spannerToClrMapping.AddOrUpdate(SpannerDbType.Date, typeof(DateTime), (dbType, type) => typeof(DateTime)),
+                    DateToSpannerDate => _spannerToClrMapping.AddOrUpdate(SpannerDbType.Date, typeof(SpannerDate), (dbType, type) => typeof(SpannerDate)),
+                    // We shouldn't come here as validations are in place. We don't have a known mapping.
+                    _ => default
+                };
+            }
+
+            return _spannerToClrMapping;
+        }
     }
 }

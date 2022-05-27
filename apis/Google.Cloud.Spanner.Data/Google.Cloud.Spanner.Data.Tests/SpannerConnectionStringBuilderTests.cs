@@ -215,5 +215,89 @@ namespace Google.Cloud.Spanner.Data.Tests
             builder = builder.WithDatabase(null);
             Assert.Null(builder.SpannerDatabase);
         }
+
+        [Fact]
+        public void ClrToSpannerTypeDefaultMappings()
+        {
+            // Defaults - When property is not set.
+            var builder = new SpannerConnectionStringBuilder();
+            Assert.True(string.IsNullOrEmpty(builder.ClrToSpannerTypeDefaultMappings)); 
+            // Check that internal mapping dictionary is populated with defaults.
+            Assert.True(builder.ClrToSpannerTypeMappings.Count == 2);
+            Assert.Equal(SpannerDbType.Float64, builder.ClrToSpannerTypeMappings[typeof(decimal)]);
+            Assert.Equal(SpannerDbType.Timestamp, builder.ClrToSpannerTypeMappings[typeof(DateTime)]);
+            
+            // Explicitly set valid type mapping.
+            builder = new SpannerConnectionStringBuilder("ClrToSpannerTypeDefaultMappings=DecimalToNumeric,DateTimeToDate");
+            // DbConnectionStringBuilder lower-cases keywords, annoyingly.
+            Assert.Equal("clrtospannertypedefaultmappings=DecimalToNumeric,DateTimeToDate", builder.ToString());
+            // Check that internal mapping dictionary is populated with user provided configuration.
+            Assert.True(builder.ClrToSpannerTypeMappings.Count == 2);
+            Assert.Equal(SpannerDbType.Numeric, builder.ClrToSpannerTypeMappings[typeof(decimal)]);
+            Assert.Equal(SpannerDbType.Date, builder.ClrToSpannerTypeMappings[typeof(DateTime)]);
+
+            // Explicitly set valid type mappings.Latest should be reflected.
+            builder.ClrToSpannerTypeDefaultMappings = "DecimalToFloat64,DateTimeToTimestamp";
+            // DbConnectionStringBuilder lower-cases keywords, annoyingly.
+            Assert.Equal("clrtospannertypedefaultmappings=DecimalToFloat64,DateTimeToTimestamp", builder.ToString());
+            // Check that internal mapping dictionary is populated with user provided configuration.
+            Assert.True(builder.ClrToSpannerTypeMappings.Count == 2);
+            Assert.Equal(SpannerDbType.Float64, builder.ClrToSpannerTypeMappings[typeof(decimal)]);
+            Assert.Equal(SpannerDbType.Timestamp, builder.ClrToSpannerTypeMappings[typeof(DateTime)]);
+        }
+
+        [Fact]
+        public void SpannerToClrTypeDefaultMappings()
+        {
+            // Defaults - When property is not set.
+            var builder = new SpannerConnectionStringBuilder();
+            Assert.True(string.IsNullOrEmpty(builder.SpannerToClrTypeDefaultMappings));
+            // Check that internal mapping dictionary is populated with defaults.
+            Assert.True(builder.SpannerToClrTypeMappings.Count == 2);
+            Assert.Equal(typeof(double), builder.SpannerToClrTypeMappings[SpannerDbType.Float64]);
+            Assert.Equal(typeof(DateTime), builder.SpannerToClrTypeMappings[SpannerDbType.Date]);
+
+            // Explicitly set valid type mappings.
+            builder = new SpannerConnectionStringBuilder("SpannerToClrTypeDefaultMappings=Float64ToSpannerNumeric,DateToDateTime");
+            // DbConnectionStringBuilder lower-cases keywords, annoyingly.
+            Assert.Equal("spannertoclrtypedefaultmappings=Float64ToSpannerNumeric,DateToDateTime", builder.ToString());
+            // Check that internal mapping dictionary is populated with user provided configuration.
+            Assert.True(builder.SpannerToClrTypeMappings.Count == 2);
+            Assert.Equal(typeof(SpannerNumeric), builder.SpannerToClrTypeMappings[SpannerDbType.Float64]);
+            Assert.Equal(typeof(DateTime), builder.SpannerToClrTypeMappings[SpannerDbType.Date]);
+
+            // Explicitly set valid type mappings. Latest should be reflected.
+            builder.SpannerToClrTypeDefaultMappings = "Float64ToDecimal,DateToSpannerDate";
+            // DbConnectionStringBuilder lower-cases keywords, annoyingly.
+            Assert.Equal("spannertoclrtypedefaultmappings=Float64ToDecimal,DateToSpannerDate", builder.ToString());
+            // Check that internal mapping dictionary is populated with user provided configuration.
+            Assert.True(builder.SpannerToClrTypeMappings.Count == 2);
+            Assert.Equal(typeof(decimal), builder.SpannerToClrTypeMappings[SpannerDbType.Float64]);
+            Assert.Equal(typeof(SpannerDate), builder.SpannerToClrTypeMappings[SpannerDbType.Date]);
+        }
+
+        [Theory]        
+        [InlineData("DecimalToFloat64,DecimalToNumeric,DateTimeToDate;")] // Multiple mappings for a type.
+        [InlineData("DecimalToFloat64,DecimalToPgNumeric,DateTimeToDate,DateTimeToTimestamp;")] // Multiple mappings for a type.
+        [InlineData("DecimalToFloat64   ,DecimalToNumeric,DateTimeToDate;")] // Multiple mappings and whitespace.       
+        [InlineData("DecimalToFloat64   ,  ,DateTimeToDate;")] // Valid mapping with whitespace.
+        [InlineData("UseFloat64ForDecimal,DecimalToNumeric,DateTimeToDate;")] // Invalid values.
+        public void BadClrToSpannerTypeDefaultMappingsThrows(string clrToSpannerTypeMappings)
+        {
+            Assert.Throws<ArgumentException>(() => new SpannerConnectionStringBuilder($"ClrToSpannerTypeDefaultMappings={clrToSpannerTypeMappings}"));            
+            Assert.Throws<ArgumentException>(() => new SpannerConnectionStringBuilder { ClrToSpannerTypeDefaultMappings = clrToSpannerTypeMappings });
+        }
+
+        [Theory]        
+        [InlineData("Float64ToDouble,Float64ToDecimal,DateToDateTime;")] // Multiple mappings for a type.
+        [InlineData("Float64ToDecimal,Float64ToPgNumeric,DateToSpannerDate;")] // Multiple mappings for a type.        
+        [InlineData("Float64ToDecimal   ,DateToDateTime;")] // Whitespace.
+        [InlineData("Float64ToDecimal   ,  ,DateToDateTime;")] // Whitespace.        
+        [InlineData("UseDecimalForFloat,DateToSpannerDate;")] // Invalid value.
+        public void BadSpannerToClrTypeDefaultMappingsThrows(string spannerToClrTypeMappings)
+        {
+            Assert.Throws<ArgumentException>(() => new SpannerConnectionStringBuilder($"SpannerToClrTypeDefaultMappings={spannerToClrTypeMappings}"));
+            Assert.Throws<ArgumentException>(() => new SpannerConnectionStringBuilder { SpannerToClrTypeDefaultMappings = spannerToClrTypeMappings });
+        }
     }
 }
