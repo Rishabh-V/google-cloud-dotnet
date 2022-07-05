@@ -1,4 +1,4 @@
-﻿// Copyright 2018 Google LLC
+// Copyright 2018 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -263,6 +263,11 @@ namespace Google.Cloud.PubSub.V1
         public static TimeSpan MinimumAckExtensionWindow { get; } = TimeSpan.FromMilliseconds(50);
 
         /// <summary>
+        /// The minimum message ACKnowledgement extension window of 60 seconds for exactly once subscriptions.
+        /// </summary>
+        public static TimeSpan MinimumAckExtensionWindowForExactlyOnce { get; } = TimeSpan.FromSeconds(60);
+
+        /// <summary>
         /// The default message ACKnowledgement extension window of 15 seconds.
         /// </summary>
         public static TimeSpan DefaultAckExtensionWindow { get; } = TimeSpan.FromSeconds(15);
@@ -427,9 +432,11 @@ namespace Google.Cloud.PubSub.V1
             // These values are validated in Settings.Validate() above, so no need to re-validate here.
             _modifyDeadlineSeconds = (int)((settings.AckDeadline ?? DefaultAckDeadline).TotalSeconds);
             var autoExtendInterval = TimeSpan.FromSeconds(_modifyDeadlineSeconds) - (settings.AckExtensionWindow ?? DefaultAckExtensionWindow);
+            var autoExtendIntervalForExactlyOnce = settings.AckExtensionWindow ?? MinimumAckExtensionWindowForExactlyOnce;
             // Ensure the duration between lease extensions is at least MinimumLeaseExtensionDelay (5 seconds).
             // The minimum allowable lease duration is 10 seconds, so this will always be reasonable.
             _autoExtendInterval = TimeSpan.FromTicks(Math.Max(autoExtendInterval.Ticks, MinimumLeaseExtensionDelay.Ticks));
+            _autoExtendIntervalForExactlyOnce = TimeSpan.FromTicks(Math.Max(autoExtendIntervalForExactlyOnce.Ticks, MinimumLeaseExtensionDelay.Ticks));
             _maxExtensionDuration = settings.MaxTotalAckExtension ?? DefaultMaxTotalAckExtension;
             _shutdown = shutdown;
             _scheduler = settings.Scheduler ?? SystemScheduler.Instance;
@@ -450,6 +457,7 @@ namespace Google.Cloud.PubSub.V1
         private readonly TaskHelper _taskHelper;
         private readonly FlowControlSettings _flowControlSettings;
         private readonly bool _useLegacyFlowControl;
+        private readonly TimeSpan _autoExtendIntervalForExactlyOnce; // Interval between message lease auto-extends for exactly once subscriptions.
 
         private TaskCompletionSource<int> _mainTcs;
         private CancellationTokenSource _globalSoftStopCts; // soft-stop is guarenteed to occur before hard-stop.
@@ -898,6 +906,7 @@ namespace Google.Cloud.PubSub.V1
                 _modifyDeadlineSeconds = subscriber._modifyDeadlineSeconds;
                 _maxAckExtendQueueSize = subscriber._maxAckExtendQueue;
                 _autoExtendInterval = subscriber._autoExtendInterval;
+                _autoExtendIntervalForExactlyOnce = subscriber._autoExtendIntervalForExactlyOnce;
                 _maxExtensionDuration = subscriber._maxExtensionDuration;
                 _extendQueueThrottleInterval = TimeSpan.FromTicks((long)((TimeSpan.FromSeconds(_modifyDeadlineSeconds) - _autoExtendInterval).Ticks * 0.5));
                 _maxAckExtendSendCount = Math.Max(10, subscriber._maxAckExtendQueue / 4);
@@ -925,6 +934,7 @@ namespace Google.Cloud.PubSub.V1
             private readonly int _maxAckExtendQueueSize; // Soft limit on push queue sizes. Used to throttle pulls.
             private readonly int _maxAckExtendSendCount; // Maximum number of ids to include in an ack/nack/extend push RPC.
             private readonly int _maxConcurrentPush; // Mamimum number (slightly soft) of concurrent ack/nack/extend push RPCs.
+            private readonly TimeSpan _autoExtendIntervalForExactlyOnce; // Delay between auto-extends for exactlyOnce subscriptions.
 
             private readonly Flow _flow;
             private readonly bool _useLegacyFlowControl;
@@ -941,6 +951,7 @@ namespace Google.Cloud.PubSub.V1
             private bool _pullComplete = false;
             private long _extendThrottleHigh = 0; // Incremented on extension, and put on extend queue items.
             private long _extendThrottleLow = 0; // Incremented after _extendQueueThrottleInterval, checked when throttling.
+            private bool _exactlyOnceDeliveryEnabled = false; // True if subscription is exactly once, else false.
 
             private readonly static RetrySettings s_pullBackoff = RetrySettings.FromExponentialBackoff(
                 maxAttempts: int.MaxValue,
@@ -949,7 +960,21 @@ namespace Google.Cloud.PubSub.V1
                 backoffMultiplier: 2.0,
                 retryFilter: _ => false // Ignored
                 );
+
+            // Retry must be done for a maximum of 10 minutes.
+            // For an exponential backoff with backoffMultiplier 1.342 and maxBackoff of 30 seconds, the maximum retry attempts is 7, please see:
+            // http://backoffcalculator.com/?interval=30&rate=1.34&attempts=7
+            private static readonly RetrySettings s_ackBackoff = RetrySettings.FromExponentialBackoff(
+                maxAttempts: 7,
+                initialBackoff: TimeSpan.FromSeconds(0.5),
+                maxBackoff: TimeSpan.FromSeconds(30),
+                backoffMultiplier: 1.342,
+                retryFilter: _ => false // Ignored
+                );
+
             private TimeSpan? _pullBackoff = null;
+
+            private TimeSpan? _ackBackoff = null;
 
             // Stream shutdown occurs after 1 minute, so ensure we're always before that.
             private readonly static TimeSpan s_streamPingPeriod = TimeSpan.FromSeconds(25);
@@ -1135,6 +1160,7 @@ namespace Google.Cloud.PubSub.V1
                     try
                     {
                         current = _pull.GrpcCall.ResponseStream.Current;
+                        _exactlyOnceDeliveryEnabled = current.SubscriptionProperties?.ExactlyOnceDeliveryEnabled ?? false;
                     }
                     catch (Exception e) when (e.As<RpcException>()?.IsRecoverable() ?? false)
                     {
@@ -1302,7 +1328,7 @@ namespace Google.Cloud.PubSub.V1
                         _eventPush.Set();
                         // Some ids still exist, schedule another extension.
                         // The overall `_maxExtensionDuration` is maintained by passing through the existing `cancellation`.
-                        Add(_scheduler.Delay(_autoExtendInterval, _softStopCts.Token), Next(false, () => HandleExtendLease(msgIds, cancellation)));
+                        Add(_scheduler.Delay(_exactlyOnceDeliveryEnabled ? _autoExtendIntervalForExactlyOnce : _autoExtendInterval, _softStopCts.Token), Next(false, () => HandleExtendLease(msgIds, cancellation)));
                         // Increment _extendThrottles.
                         _extendThrottleHigh += 1;
                         Add(_scheduler.Delay(_extendQueueThrottleInterval, _softStopCts.Token), Next(false, () => _extendThrottleLow += 1));
@@ -1352,21 +1378,107 @@ namespace Google.Cloud.PubSub.V1
                     _pushInFlight += acks.Count;
                     _concurrentPushCount += 1;
                     Task ackTask = _client.AcknowledgeAsync(_subscriptionName, acks, _hardStopCts.Token);
-                    Add(ackTask, Next(false, () => HandleAckResponse(ackTask, acks, null, null)));
+                    Add(ackTask, Next(false, _exactlyOnceDeliveryEnabled ? () => HandleAckResponseForExactlyOnce(ackTask, acks, null, null) : () => HandleAckResponse(ackTask, acks, null, null)));
                 }
                 if (extends.Count > 0)
                 {
                     _pushInFlight += extends.Count;
                     _concurrentPushCount += 1;
                     Task extendTask = _client.ModifyAckDeadlineAsync(_subscriptionName, extends.Select(x => x.Id), _modifyDeadlineSeconds, _hardStopCts.Token);
-                    Add(extendTask, Next(false, () => HandleAckResponse(extendTask, null, null, extends)));
+                    Add(extendTask, Next(false, _exactlyOnceDeliveryEnabled ? () => HandleAckResponseForExactlyOnce(extendTask, null, null, extends) : () => HandleAckResponse(extendTask, null, null, extends)));
                 }
                 if (nacks.Count > 0)
                 {
                     _pushInFlight += nacks.Count;
                     _concurrentPushCount += 1;
                     Task nackTask = _client.ModifyAckDeadlineAsync(_subscriptionName, nacks, 0, _hardStopCts.Token);
-                    Add(nackTask, Next(false, () => HandleAckResponse(nackTask, null, nacks, null)));
+                    Add(nackTask, Next(false, _exactlyOnceDeliveryEnabled ? () => HandleAckResponseForExactlyOnce(nackTask, null, nacks, null) : () => HandleAckResponse(nackTask, null, nacks, null)));
+                }
+            }
+
+            private void HandleAckResponseForExactlyOnce(Task writeTask, List<string> ackIds, List<string> nackIds, List<TimedId> extendIds)
+            {
+                _concurrentPushCount -= 1;
+                _pushInFlight -= ackIds?.Count ?? 0 + nackIds?.Count ?? 0 + extendIds?.Count ?? 0;
+
+                if (writeTask.IsFaulted)
+                {
+                    var ackError = writeTask.Exception.As<RpcException>()?.GetAckError();
+                    bool retryAll = ackError?.RetryAll ?? false;
+                    bool hasTemporaryFailures = ackError?.HasTemporaryErrors ?? false;
+
+                    if (retryAll || hasTemporaryFailures)
+                    {
+                        _ackBackoff = s_ackBackoff.NextBackoff(_ackBackoff ?? TimeSpan.Zero);
+                    }
+
+                    // Temporary error due to gRPC status code, retry all.
+                    if (retryAll)
+                    {
+                        if (ackIds != null && ackIds.Count > 0)
+                        {
+                            lock (_lock)
+                            {
+                                _ackQueue.Requeue(ackIds);
+                            }
+                        }
+                        if (nackIds != null && nackIds.Count > 0)
+                        {
+                            lock (_lock)
+                            {
+                                _nackQueue.Requeue(nackIds);
+                            }
+                        }
+                        if (extendIds != null && extendIds.Count > 0)
+                        {
+                            _extendQueue.Requeue(extendIds);
+                        }
+                    }
+                    else if (hasTemporaryFailures)
+                    {
+                        // Few may have succeeded, few may have failed with temporary or permanent error.
+                        // Retry only the temporary failed ones.
+                        if (ackIds != null && ackIds.Count > 0)
+                        {
+                            lock (_lock)
+                            {
+                                _ackQueue.Requeue(ackError.TemporaryFailureIds);
+                            }
+                        }
+                        if (nackIds != null && nackIds.Count > 0)
+                        {
+                            lock (_lock)
+                            {
+                                _nackQueue.Requeue(ackError.TemporaryFailureIds);
+                            }
+                        }
+                        if (extendIds != null && extendIds.Count > 0)
+                        {
+                            _extendQueue.Requeue(extendIds.Where(j => ackError.TemporaryFailureIds.Contains(j.Id)));
+                        }
+                    }
+                    else
+                    {
+                        // Permanent Failure or non-gRPC error. Throw it.
+                        throw writeTask.Exception.FlattenIfPossible();
+                    }
+                }
+
+                // Start push with exponential backoff.
+                StartPushWithBackoff();
+            }
+
+            private void StartPushWithBackoff()
+            {
+                if (_ackBackoff is TimeSpan backoff)
+                {
+                    // Delay, then start the push.
+                    Task delayTask = _scheduler.Delay(backoff, _softStopCts.Token);
+                    Add(delayTask, Next(false, StartPush));
+                }
+                else
+                {
+                    StartPush();
                 }
             }
 
