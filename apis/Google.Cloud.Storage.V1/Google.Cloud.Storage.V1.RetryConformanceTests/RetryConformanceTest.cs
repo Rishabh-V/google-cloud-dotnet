@@ -1,4 +1,4 @@
-﻿// Copyright 2022 Google LLC
+// Copyright 2022 Google LLC
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,30 +75,18 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
             {
                 foreach (string instruction in testCase.Instructions)
                 {
-<<<<<<< HEAD
-                foreach (Method method in test.Methods)
-                {
-=======
                     foreach (Method method in test.Methods)
                     {
->>>>>>> 521534e9db (Working Skeleton code to set the structure.)
                         // TODO: Remove this if condition, when the mapping dictionary is completely and correctly populated.
                         if (method.Name.Contains("hmacKey.list"))
                         {
                             await RunTestCase(instruction, method, expectSuccess);
-<<<<<<< HEAD
-                }
-            }
-        }
-            }
-        }
-=======
+
                         }
                     }
                 }
             }
         }
->>>>>>> 521534e9db (Working Skeleton code to set the structure.)
 
         private async Task RunTestCase(string instruction, Method method, bool expectSuccess)
         {
@@ -124,7 +112,7 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
             }
 
             Assert.Equal(expectSuccess, success);
-            
+
             // Delete the retry test and delete Storage Resource as well.
             await DeleteRetryTest(response.Id);
         }
@@ -179,7 +167,7 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
                 {
                     invocation.Notification = resources.Notification;
                 }
-                
+
                 invocation.Invoke(_storageClient);
             }
         }
@@ -216,24 +204,20 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
             // Just to proceed with testing for now.
             _ => new MethodInvocation(s_clientType.GetMethod(nameof(StorageClient.GetBucket)), false, true, false, false, false, false, false),
         };
-            
+
         private async Task<TestResponse> GetRetryTest(string id)
-            {
+        {
             HttpResponseMessage response = await _httpClient.GetAsync($"retry_test/{id}");
             response.EnsureSuccessStatusCode();
             var responseMessage = await response.Content.ReadAsStringAsync();
             return JsonConvert.DeserializeObject<TestResponse>(responseMessage);
-            }
+        }
 
         private async Task DeleteRetryTest(string id)
-            {
+        {
             HttpResponseMessage response = await _httpClient.DeleteAsync($"retry_test/{id}");
             response.EnsureSuccessStatusCode();
-<<<<<<< HEAD
-            }
-=======
         }
-
         private async Task<StorageResources> CreateStorageResources(Method method)
         {
             var result = new StorageResources();
@@ -275,7 +259,7 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
                     result.Add(new StorageResource(Resource.Object, objectCreated.Name));
                 }
             }
-            
+
             return result;
         }
 
@@ -334,115 +318,11 @@ namespace Google.Cloud.Storage.V1.RetryConformanceTests
 
             return new StringContent(builder.ToString(), Encoding.UTF8, "application/json");
         }
->>>>>>> 521534e9db (Working Skeleton code to set the structure.)
 
-        private async Task<StorageResources> CreateStorageResources(Method method)
+        private static string GetEnvironmentVariableOrDefault(string name, string defaultValue)
         {
-<<<<<<< HEAD
-            var result = new StorageResources();
-
-            string bucket = IdGenerator.FromGuid();
-            string objectName = "TestFile.json"; // Could be any other file name as well.
-            // This will ensure that for the given test, object/notification are linked to correct bucket.
-            foreach (var item in method.Resources)
-            {
-                if (item.ToString().Equals("BUCKET", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Storage Client CreateBucket API CreateBucket(ProjectId, bucket) is failing with test bench.
-                    // This is a quick hack to create a bucket in test bench.
-                    var created = await CreateBucket(ProjectId, bucket);
-                    if (created)
-                    {
-                        result.Add(new StorageResource(Resource.Bucket, bucket));
-                    }
-                }
-
-                if (item.ToString().Equals("HMACKEY", StringComparison.OrdinalIgnoreCase))
-                {
-                    var hmacKey = _storageClient.CreateHmacKey(ProjectId, ServiceAccountEmail);
-                    AccessId = hmacKey.Metadata.AccessId;
-                    result.Add(new StorageResource(Resource.HmacKey, hmacKey.Secret));
-                }
-            
-                if (item.ToString().Equals("NOTIFICATION", StringComparison.OrdinalIgnoreCase))
-                {
-                    var config = new Notification { Topic = $"//pubsub.googleapis.com/{Topic}", PayloadFormat = "JSON_API_V1" };
-                    var notification = _storageClient.CreateNotification(bucket, config);
-                    result.Add(new StorageResource(Resource.Notification, notification.Id));
-        }
-
-                if (item.ToString().Equals("OBJECT", StringComparison.OrdinalIgnoreCase))
-        {
-                    using var stream = File.OpenRead(FilePath);
-                    var objectCreated = _storageClient.UploadObject(bucket, objectName, "application/json", stream);
-                    result.Add(new StorageResource(Resource.Object, objectCreated.Name));
-                }
-            }
-            
-            return result;
-        }
-
-        private async Task<bool> CreateBucket(string projectId, string bucket)
-        {
-            var content = new StringContent($"{{\"name\":\"{bucket}\"}}");
-            var response = await _httpClient.PostAsync($"storage/v1/b?project={projectId}", content);
-            return response.IsSuccessStatusCode;
-        }
-
-        private void AddHeader(string header, string value)
-        {
-            bool contains = _storageClient.Service.HttpClient.DefaultRequestHeaders.Contains(header);
-            if (contains)
-        {
-                // Remove.
-                _storageClient.Service.HttpClient.DefaultRequestHeaders.Remove(header);
-            }
-
-            _storageClient.Service.HttpClient.DefaultRequestHeaders.TryAddWithoutValidation(header, value);
-        }
-
-        private string GetMethodName(TestResponse response)
-        {
-            if (response.Instructions.Any())
-            {
-                var token = response.Instructions.First().Value;
-                if (token?.First is JProperty first)
-        {
-                    return first.Name;
-                }
-            }
-
-            return default;
-        }
-            
-        private void AddRetryIdHeader(string id)
-        {
-            AddHeader("x-retry-test-id", id);
-        }
-
-        private static StringContent GetBodyContent(string methodName, string instruction)
-        {
-            if (string.IsNullOrWhiteSpace(methodName) || string.IsNullOrWhiteSpace(instruction))
-        {
-                return null;
-            }
-
-            StringBuilder builder = new StringBuilder();
-
-            builder.AppendLine(" { ");
-            builder.Append("\"instructions\":");
-            builder.Append($" {{\"{methodName}\":");
-            builder.Append($" [\"{instruction}\"]}}");
-            builder.Append(" } ");
-
-            return new StringContent(builder.ToString(), Encoding.UTF8, "application/json");
-        }
-
-        public bool Completed { get; set; }
-=======
             string value = Environment.GetEnvironmentVariable(name);
             return string.IsNullOrEmpty(value) ? defaultValue : value;
         }
->>>>>>> 521534e9db (Working Skeleton code to set the structure.)
     }
 }
