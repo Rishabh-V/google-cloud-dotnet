@@ -1,5 +1,17 @@
 # Version history
 
+## Version 3.2.0, released 2022-08-26
+
+### Bug fixes
+
+- Code review fixes for exactly once delivery ([commit aa8c4d6](https://github.com/googleapis/google-cloud-dotnet/commit/aa8c4d6cfe488e7f658ad65b028c3604ee3772cc))
+
+### New features
+
+- Exactly once delivery (feature complete) ([commit e93c4d3](https://github.com/googleapis/google-cloud-dotnet/commit/e93c4d38bd93f2ff0547022a77578f10b0abd884))
+- Add support for exactly once subscription ([commit 46d8b0d](https://github.com/googleapis/google-cloud-dotnet/commit/46d8b0d0581c9098b1e756663c59856430106634))
+- A small refactoring of exactly-once code ([commit 2f97dc3](https://github.com/googleapis/google-cloud-dotnet/commit/2f97dc392b4b7add1755f07709cda97b953a4b41))
+
 ## Version 3.1.0, released 2022-07-27
 
 ### New features
