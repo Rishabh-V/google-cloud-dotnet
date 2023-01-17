@@ -34,8 +34,9 @@ jobs:
         dotnet-version: 6.0.x
         
     - name: Docker run  
-      run: docker run -d --name storage-testbench -p 9000:9000 gcr.io/cloud-devrel-public-resources/storage-testbench:latest
-    
+      #run: docker run -d --name storage-testbench -p 9000:9000 gcr.io/cloud-devrel-public-resources/storage-testbench:latest
+      run: docker run -i --name storage-testbench --rm -p 9000:9000 gcr.io/cloud-devrel-public-resources/storage-testbench:latest
+      
     - name: Wait for the storage emulator
       run: sleep 10
       
