@@ -42,7 +42,7 @@ jobs:
       run: |
          mkdir -p log
          docker logs storage-testbench > log/docker.log
-         cat Google.Cloud.Storage.V1.RetryConformanceTests.trx > log/test_results.log
+         
     - name: Save the log files as an artifact
       uses: actions/upload-artifact@v2
       with:
