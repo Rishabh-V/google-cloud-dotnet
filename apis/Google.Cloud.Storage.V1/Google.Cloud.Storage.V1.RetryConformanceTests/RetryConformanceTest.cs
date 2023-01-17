@@ -54,7 +54,7 @@ public class RetryConformanceTest
     public async Task RetryTest(RetryTest test)
     {
         Skip.IfNot(ShouldRunTest(test));
-
+        ServicePointManager.ServerCertificateValidationCallback += (sender, cert, chain, sslPolicyErrors) => true;
         foreach (InstructionList instructionList in test.Cases)
         {
             foreach (Method method in test.Methods)
