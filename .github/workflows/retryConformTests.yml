@@ -40,10 +40,9 @@ jobs:
     - name: Wait for the storage emulator
       run: sleep 10
       
-    - name: Test test bench
-      uses: wei/curl@v1
-      with:
-        args: -X GET localhost:9000
+    - name: Run cURL
+      run: |
+            curl -v http://localhost:9000
 
     - name: Test
       run: dotnet test Google.Cloud.Storage.V1.RetryConformanceTests.csproj
