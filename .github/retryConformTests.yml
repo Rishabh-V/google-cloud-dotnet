@@ -1,0 +1,53 @@
+name: Run Storage Retry conformance tests against service emulator
+
+on:
+  push:
+    branches: [ main ] 
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+        working-directory: /home/runner/work/google-cloud-dotnet/google-cloud-dotnet/apis/Google.Cloud.Storage.V1/Google.Cloud.Storage.V1.RetryConformanceTests/
+    steps:
+    - uses: actions/checkout@v3.5.0
+      with:
+        submodules: true
+
+    # Install .NET Core 3.1 for testing
+    - name: Setup .NET Core 3.1
+      uses: actions/setup-dotnet@v3.5.0
+      with:
+        dotnet-version: 3.1.x
+
+    # Install .NET 6 for building
+    - name: Setup .NET 6.0
+      uses: actions/setup-dotnet@v3.5.0
+      with:
+        dotnet-version: 6.0.x
+      
+    - name: Docker run  
+      run: docker run -d --name storage-testbench -p 9000:9000 gcr.io/cloud-devrel-public-resources/storage-testbench:latest
+    
+    - name: Wait for the storage emulator
+      run: sleep 30
+
+    - run: dotnet test Google.Cloud.Storage.V1.RetryConformanceTests.csproj
+      env:
+        TEST_BENCH_URL: http://localhost:9000/
+    - name: Stop and remove container
+      run: docker stop storage-testbench && docker rm storage-testbench
+    - name: Save log files
+      run: |
+         mkdir -p log
+         docker logs storage-testbench > log/docker.log
+         cat Google.Cloud.Storage.V1.RetryConformanceTests.trx > log/test_results.log
+    - name: Save the log files as an artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: logs
+        path: log
