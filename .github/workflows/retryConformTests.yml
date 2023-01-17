@@ -38,8 +38,6 @@ jobs:
       env:
         TEST_BENCH_URL: http://localhost:9000/
         
-    - name: Stop and remove container
-      run: docker stop storage-testbench && docker rm storage-testbench
     - name: Save log files
       run: |
          mkdir -p log
@@ -50,3 +48,5 @@ jobs:
       with:
         name: logs
         path: log
+    - name: Stop and remove container
+      run: docker stop storage-testbench && docker rm storage-testbench
