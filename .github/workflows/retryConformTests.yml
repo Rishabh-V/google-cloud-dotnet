@@ -31,10 +31,10 @@ jobs:
       run: docker run -d --name storage-testbench -p 9000:9000 gcr.io/cloud-devrel-public-resources/storage-testbench:latest
     
     - name: Wait for the storage emulator
-      run: sleep 30
+      run: sleep 10
 
     - name: Test
-      run: dotnet test Google.Cloud.Storage.V1.RetryConformanceTests.csproj --no-build --verbosity detailed      
+      run: dotnet test Google.Cloud.Storage.V1.RetryConformanceTests.csproj --verbosity detailed      
       env:
         TEST_BENCH_URL: http://localhost:9000/
         
