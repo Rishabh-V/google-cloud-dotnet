@@ -1,0 +1,56 @@
+# This workflow will build a .NET project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: Run Storage retry conformance tests against the storage test bench
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+    defaults:
+       run:
+        shell: bash
+        working-directory: /home/runner/work/google-cloud-dotnet/google-cloud-dotnet/apis/Google.Cloud.Storage.V1/Google.Cloud.Storage.V1.RetryConformanceTests/
+    steps:
+    - uses: actions/checkout@v3.5.0
+      with:
+          submodules: true
+    
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v3.5
+      with:
+        dotnet-version: 6.0.x
+    - name: Restore dependencies
+      run: dotnet restore
+    - name: Build
+      run: dotnet build --no-restore
+      
+    - name: Docker run  
+      run: docker run -d --name storage-testbench -p 9000:9000 gcr.io/cloud-devrel-public-resources/storage-testbench:latest
+    
+    - name: Wait for the storage emulator
+      run: sleep 30
+
+    - name: Test
+      run: dotnet test --no-build --verbosity debug      
+      env:
+        TEST_BENCH_URL: http://localhost:9000/
+        
+    - name: Stop and remove container
+      run: docker stop storage-testbench && docker rm storage-testbench
+    - name: Save log files
+      run: |
+         mkdir -p log
+         docker logs storage-testbench > log/docker.log
+         cat Google.Cloud.Storage.V1.RetryConformanceTests.trx > log/test_results.log
+    - name: Save the log files as an artifact
+      uses: actions/upload-artifact@v2
+      with:
+        name: logs
+        path: log
