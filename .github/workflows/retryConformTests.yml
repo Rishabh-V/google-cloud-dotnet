@@ -40,7 +40,7 @@ jobs:
       run: sleep 10
 
     - name: Test
-      run: dotnet test Google.Cloud.Storage.V1.RetryConformanceTests.csproj   
+      run: dotnet test Google.Cloud.Storage.V1.RetryConformanceTests.csproj --no-restore
       env:
         TEST_BENCH_URL: http://localhost:9000/
         
