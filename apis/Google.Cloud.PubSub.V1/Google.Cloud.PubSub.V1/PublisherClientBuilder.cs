@@ -129,7 +129,7 @@ public sealed class PublisherClientBuilder : ClientBuilderBase<PublisherClient>
             shutdowns[i] = channel is null ? () => Task.CompletedTask : channel.ShutdownAsync;
         }
         Func<Task> shutdown = () => Task.WhenAll(shutdowns.Select(x => x()));
-        return new PublisherClientImpl(TopicName, clients, settings, shutdown);
+        return new InstrumentedPublisherClientImpl(new PublisherClientImpl(TopicName, clients, settings, shutdown));
     }
 
     /// <inheritdoc />

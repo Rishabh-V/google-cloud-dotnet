@@ -36,6 +36,7 @@ namespace Google.Cloud.PubSub.V1
     /// <summary>
     /// A PubSub publisher that is associated with a specific <see cref="TopicName"/>.
     /// </summary>
+    [Instrumentation]
     public abstract class PublisherClient
     {
         private static readonly GrpcChannelOptions s_unlimitedSendReceiveChannelOptions = GrpcChannelOptions.Empty

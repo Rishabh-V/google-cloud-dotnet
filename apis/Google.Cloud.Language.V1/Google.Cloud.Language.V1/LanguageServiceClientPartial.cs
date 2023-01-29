@@ -1,4 +1,4 @@
-﻿// Copyright 2016 Google Inc. All Rights Reserved.
+// Copyright 2016 Google Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,7 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+using Google.Api.Gax;
 using Google.Api.Gax.Grpc;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using static Google.Cloud.Language.V1.AnnotateTextRequest.Types;
@@ -36,9 +38,12 @@ namespace Google.Cloud.Language.V1
         /// <returns>The result of the entity analysis.</returns>
         public virtual AnalyzeEntitiesResponse AnalyzeEntities(
             Document document,
-            CallSettings callSettings = null) =>
-            AnalyzeEntities(document, EncodingType.Utf16, callSettings);
-
+            CallSettings callSettings = null)
+        {
+            using var activity = TypeActivitySource<LanguageServiceClient>.ActivitySource.StartActivity();
+            _ = activity?.SetTag(nameof(document), document);
+            return AnalyzeEntities(document, EncodingType.Utf16, callSettings);
+        }
         /// <summary>
         /// Analyzes the entities in the given document asynchronously, specifying an <see cref="EncodingType"/> of
         /// UTF-16 for offsets.
@@ -72,9 +77,13 @@ namespace Google.Cloud.Language.V1
         /// <returns>A task representing the asynchronous operation. The result of the task is the entity analysis response.</returns>
         public virtual Task<AnalyzeEntitiesResponse> AnalyzeEntitiesAsync(
             Document document,
-            CallSettings callSettings = null) =>
-            AnalyzeEntitiesAsync(document, EncodingType.Utf16, callSettings);
-
+            CallSettings callSettings = null)
+        {
+            using var activity = TypeActivitySource<LanguageServiceClient>.ActivitySource.StartActivity();
+            _ = activity.SetTag(nameof(document), document);
+            return AnalyzeEntitiesAsync(document, EncodingType.Utf16, callSettings);
+        }
+        
         /// <summary>
         /// Analyzes the syntax in the given document, specifying an <see cref="EncodingType"/> of
         /// UTF-16 for offsets.
