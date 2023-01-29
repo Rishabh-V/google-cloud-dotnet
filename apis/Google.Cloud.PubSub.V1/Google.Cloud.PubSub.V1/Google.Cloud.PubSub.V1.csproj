@@ -2,7 +2,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <Version>3.2.0</Version>
-    <TargetFrameworks>netstandard2.1</TargetFrameworks>
+    <TargetFrameworks>netstandard2.1;net462</TargetFrameworks>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
     <Description>Recommended Google client library to access the Google Cloud Pub/Sub API, which provides reliable, many-to-many, asynchronous messaging between applications.</Description>
     <PackageTags>PubSub;Google;Cloud</PackageTags>
@@ -12,9 +12,6 @@
     <PackageReference Include="Google.Api.Gax.Grpc" Version="[4.2.0, 5.0.0)" />
     <PackageReference Include="Google.Cloud.Iam.V1" Version="[3.0.0, 4.0.0)" />
     <PackageReference Include="Grpc.Core" Version="[2.46.3, 3.0.0)" PrivateAssets="None" Condition="'$(TargetFramework)'=='net462'" />
+    <PackageReference Include="System.Diagnostics.DiagnosticSource" Version="6.0.0" />
   </ItemGroup>
-<ItemGroup>
-    <ProjectReference Include="..\..\..\..\gax-dotnet\Google.Api.Gax\Google.Api.Gax.csproj" />
-    <ProjectReference Include="C:\Users\rishabhverma\source\repos\AutomaticInstrumentation\InstrumentationGenerator\InstrumentationGenerator.csproj" OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
-</ItemGroup>
 </Project>
