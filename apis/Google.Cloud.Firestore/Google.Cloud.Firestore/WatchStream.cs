@@ -200,7 +200,10 @@ namespace Google.Cloud.Firestore
                         // being dropped, at which point completing the stream will fail; we don't want the listener to stop at that
                         // point. Instead, it will reconnect.
                     }
-                    underlyingStream.GrpcCall.Dispose();
+                    finally
+                    {
+                        underlyingStream.Dispose();
+                    }
                 }
                 underlyingStream = null;
             }
